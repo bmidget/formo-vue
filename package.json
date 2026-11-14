@@ -1,0 +1,92 @@
+{
+  "name": "formo-vue",
+  "version": "0.1.0",
+  "description": "Formo \u2014 forms as objects \u2014 rebuilt as Vue 3 components with VeeValidate validation and Tailwind styling.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/formo-vue.js",
+  "module": "./dist/formo-vue.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/formo-vue.js"
+    },
+    "./src/*": "./src/*"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "predev": "bun scripts/check-native.ts",
+    "dev": "vite",
+    "prebuild": "bun scripts/check-native.ts",
+    "build": "vite build --mode lib && vue-tsc -p tsconfig.build.json",
+    "prebuild:playground": "bun scripts/check-native.ts",
+    "build:playground": "vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+    "pretest": "bun scripts/check-native.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:deps": "bun scripts/check-deps.ts",
+    "check": "bun run check:native && bun run check:platforms && bun run check:deps && bun run typecheck && bun run test",
+    "check:native": "bun scripts/check-native.ts",
+    "check:platforms": "bun scripts/check-platforms.ts"
+  },
+  "peerDependencies": {
+    "vee-validate": "^4.15.0",
+    "vue": "^3.4.0"
+  },
+  "dependencies": {
+    "@vee-validate/rules": "^4.15.1",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "^26.6.6",
+    "@vee-validate/i18n": "^4.15.1",
+    "@vitejs/plugin-vue": "^6",
+    "@vue/compiler-dom": "^3.5",
+    "@vue/test-utils": "^2",
+    "happy-dom": "^21.0.4",
+    "laravel-vue-i18n": "^2.9.0",
+    "rolldown": "1.2.15",
+    "tailwindcss": "4.3.3",
+    "typescript": "~5.9.3",
+    "vee-validate": "^4.15.1",
+    "vite": "8.3.5",
+    "vitest": "^5",
+    "vue": "^3.5",
+    "vue-i18n": "^11.4.16",
+    "vue-tsc": "^3",
+    "zod": "^4"
+  },
+  "optionalDependencies": {
+    "@rolldown/binding-darwin-arm64": "1.2.15",
+    "@rolldown/binding-darwin-x64": "1.2.15",
+    "@rolldown/binding-linux-arm64-gnu": "1.2.15",
+    "@rolldown/binding-linux-arm64-musl": "1.2.15",
+    "@rolldown/binding-linux-x64-gnu": "1.2.15",
+    "@rolldown/binding-linux-x64-musl": "1.2.15",
+    "@tailwindcss/oxide-darwin-arm64": "4.3.3",
+    "@tailwindcss/oxide-darwin-x64": "4.3.3",
+    "@tailwindcss/oxide-linux-arm64-gnu": "4.3.3",
+    "@tailwindcss/oxide-linux-arm64-musl": "4.3.3",
+    "@tailwindcss/oxide-linux-x64-gnu": "4.3.3",
+    "@tailwindcss/oxide-linux-x64-musl": "4.3.3",
+    "lightningcss-darwin-arm64": "1.33.0",
+    "lightningcss-darwin-x64": "1.33.0",
+    "lightningcss-linux-arm64-gnu": "1.33.0",
+    "lightningcss-linux-arm64-musl": "1.33.0",
+    "lightningcss-linux-x64-gnu": "1.33.0",
+    "lightningcss-linux-x64-musl": "1.33.0"
+  },
+  "overrides": {
+    "rolldown": "1.2.15",
+    "@tailwindcss/oxide": "4.3.3",
+    "lightningcss": "1.33.0"
+  }
+}

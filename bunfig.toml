@@ -1,0 +1,5 @@
+[install]
+# Isolated (pnpm-style) node_modules: only packages declared in package.json
+# are resolvable from this project, so an undeclared import fails right away
+# instead of working by accident through hoisting.
+linker = "isolated"
