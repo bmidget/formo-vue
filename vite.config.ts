@@ -2,7 +2,6 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
-import { mockLaravel } from './playground/server/mock-laravel.ts'
 import { aliases } from './aliases.config.ts'
 
 /**
@@ -41,8 +40,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     root: fileURLToPath(new URL('./playground', import.meta.url)),
-    // mockLaravel(): a fake Laravel backend for the CSRF example (dev server only)
-    plugins: [vue(), tailwindcss(), mockLaravel()],
+    plugins: [vue(), tailwindcss()],
     resolve: {
       alias: aliases,
     },

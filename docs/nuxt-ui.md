@@ -18,6 +18,10 @@ it, and yours stays configured the way you configure it (`app.config.ts`,
 - [Your own markup](#your-own-markup)
 - [Going further](#going-further)
 
+## Live Demo
+
+<Demo name="nuxt-ui" />
+
 ## Setup
 
 ### Nuxt

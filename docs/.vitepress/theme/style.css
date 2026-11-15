@@ -1,0 +1,27 @@
+@import "tailwindcss";
+@import "../../../playground/stubs/tokens.css";
+
+@source "../../../src";
+@source "../../../registry";
+@source "../../../playground";
+@source "../../../docs";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Let Demo code blocks use VitePress's Shiki styling cleanly inside .vp-raw */
+.formo-demo-code div[class*='language-'] {
+  margin: 0;
+  border-radius: 0;
+}
+
+.formo-demo-code pre.shiki {
+  max-height: 70vh;
+  overflow: auto;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  font-size: 13px;
+  line-height: 1.6;
+}

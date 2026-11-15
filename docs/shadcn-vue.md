@@ -18,6 +18,10 @@ parts, `components`, per-field `props`.
 - [Editing the theme](#editing-the-theme)
 - [How the registry item is built](#how-the-registry-item-is-built)
 
+## Live Demo
+
+<Demo name="shadcn-vue" />
+
 ## Install
 
 ```bash
