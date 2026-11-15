@@ -1,12 +1,12 @@
 import type { FormoDriver, FieldNode, FormoOptionItem } from '../types'
-import FormoInput from '../components/controls/FormoInput.vue'
-import FormoTextarea from '../components/controls/FormoTextarea.vue'
-import FormoSelect from '../components/controls/FormoSelect.vue'
-import FormoCheckbox from '../components/controls/FormoCheckbox.vue'
-import FormoChoices from '../components/controls/FormoChoices.vue'
-import FormoDatalist from '../components/controls/FormoDatalist.vue'
-import FormoFile from '../components/controls/FormoFile.vue'
-import FormoButton from '../components/controls/FormoButton.vue'
+import FormoInputControl from '../components/controls/FormoInputControl.vue'
+import FormoTextareaControl from '../components/controls/FormoTextareaControl.vue'
+import FormoSelectControl from '../components/controls/FormoSelectControl.vue'
+import FormoCheckboxControl from '../components/controls/FormoCheckboxControl.vue'
+import FormoChoicesControl from '../components/controls/FormoChoicesControl.vue'
+import FormoDatalistControl from '../components/controls/FormoDatalistControl.vue'
+import FormoFileControl from '../components/controls/FormoFileControl.vue'
+import FormoButtonControl from '../components/controls/FormoButtonControl.vue'
 import { markBuiltin } from './builtin'
 import { optionLabel } from './options'
 import { toArray } from './utils'
@@ -28,63 +28,70 @@ export const defaultDrivers: Record<string, FormoDriver> = {
   group: { parent: true },
 
   input: {
-    component: markBuiltin(FormoInput),
-    layout: (node) => (NO_LABEL_TYPES.has(node.type ?? '') ? 'bare' : 'stacked'),
-    labelAs: (node) => (NO_LABEL_TYPES.has(node.type ?? '') ? false : 'label'),
+    component: markBuiltin(FormoInputControl),
+    // hidden: the control alone; buttons: no label; everything else: label above
+    view: (node) => (node.type === 'hidden' ? false : NO_LABEL_TYPES.has(node.type ?? '') ? 'bare' : 'field'),
     defaultValue: (node) => (node.type === 'number' || node.type === 'range' ? null : ''),
     // Formo `input_rules`: html5 types get validation rules automatically
     rules: (node, config) => config.inputRules[node.type ?? 'text'],
+    // number / range: a number (or null), whatever the control emits (UI libraries' inputs emit strings)
+    parse: (value, node) => {
+      if (node.type !== 'number' && node.type !== 'range') return value
+      if (value === '' || value === null || value === undefined) return null
+      const number = Number(value)
+      return Number.isNaN(number) ? value : number
+    },
   },
 
   textarea: {
-    component: markBuiltin(FormoTextarea),
+    component: markBuiltin(FormoTextareaControl),
     defaultValue: () => '',
   },
 
   select: {
-    component: markBuiltin(FormoSelect),
+    component: markBuiltin(FormoSelectControl),
     defaultValue: (node) => (node.attr.multiple ? [] : null),
     display: displayOptions,
   },
 
   datalist: {
-    component: markBuiltin(FormoDatalist),
+    component: markBuiltin(FormoDatalistControl),
     defaultValue: () => '',
   },
 
   /** A single boolean checkbox (Formo `checkbox` / `bool`) */
   checkbox: {
-    component: markBuiltin(FormoCheckbox),
-    layout: 'inline',
+    component: markBuiltin(FormoCheckboxControl),
+    view: 'inline',
     defaultValue: () => false,
     display: (value) => (value ? 'Yes' : 'No'),
   },
 
   checkboxes: {
-    component: markBuiltin(FormoChoices),
-    labelAs: 'title',
+    component: markBuiltin(FormoChoicesControl),
+    view: 'fieldset',
     defaultValue: () => [],
     display: displayOptions,
   },
 
   radios: {
-    component: markBuiltin(FormoChoices),
-    labelAs: 'title',
+    component: markBuiltin(FormoChoicesControl),
+    view: 'fieldset',
     defaultValue: () => null,
     display: displayOptions,
   },
 
   /** Checkboxes whose value is a comma separated string (MySQL SET columns) */
   set: {
-    component: markBuiltin(FormoChoices),
-    labelAs: 'title',
+    component: markBuiltin(FormoChoicesControl),
+    view: 'fieldset',
     defaultValue: () => '',
     display: (value, node, options) =>
       displayOptions(String(value ?? '').split(',').filter(Boolean), node, options),
   },
 
   file: {
-    component: markBuiltin(FormoFile),
+    component: markBuiltin(FormoFileControl),
     defaultValue: (node) => (node.attr.multiple ? [] : null),
     display: (value) =>
       toArray(value as File | File[])
@@ -98,21 +105,16 @@ export const defaultDrivers: Record<string, FormoDriver> = {
   },
 
   button: {
-    component: markBuiltin(FormoButton),
-    layout: 'bare',
-    labelAs: false,
+    component: markBuiltin(FormoButtonControl),
+    view: 'bare',
     valueless: true,
   },
 }
 
-export function resolveLayout(driver: FormoDriver | undefined, node: FieldNode) {
-  const layout = driver?.layout
-  return (typeof layout === 'function' ? layout(node) : layout) ?? 'stacked'
-}
-
-export function resolveLabelAs(driver: FormoDriver | undefined, node: FieldNode) {
-  const as = driver?.labelAs
-  return (typeof as === 'function' ? as(node) : as) ?? 'label'
+/** The view name a driver gives its fields (`field` unless it says otherwise) */
+export function driverView(driver: FormoDriver | undefined, node: FieldNode): string | false {
+  const view = driver?.view
+  return (typeof view === 'function' ? view(node) : view) ?? 'field'
 }
 
 export function defaultValueFor(driver: FormoDriver | undefined, node: FieldNode): unknown {

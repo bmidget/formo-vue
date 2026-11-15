@@ -1,23 +1,39 @@
 <script setup lang="ts">
 /**
- * Tailwind everywhere: every element takes its classes from a theme key
- * (`control`, `label`, `group`, `error`, …). Themes merge with
- * tailwind-merge, so overrides only need the classes that change:
+ * A theme is Formo's template directory: the *views* that lay a form out (the
+ * Vue versions of field_template.php, group_template.php…), the controls, and
+ * the classes they use. Swap any of them:
  *
- *   app-wide   createFormo({ theme })
- *   per form   <FormoForm :theme="…">
- *   per group  { driver: 'group', theme: {…} }   (cascades to its fields)
- *   per field  { classes: {…} }  or  attr: { class: '…' } on the control
+ *   defineTheme({ extends: defaultTheme, views: { field: FloatingField } })   new views
+ *   defineTheme({ views, components, classes })                              a whole new theme
+ *
+ *   app-wide   createFormo({ theme })          per form   <FormoForm :theme="…">
+ *   per group  { fields: {…}, theme: … }        per field  { view: 'floating' } (a named view)
+ *
+ * Just restyling? Class overrides merge with the theme's (tailwind-merge here):
+ *   createFormo({ classes })  ·  <FormoForm :classes="…">  ·  { classes: {…} } on a field
  */
 import { computed, ref } from 'vue'
-import { Formo, FormoForm, useFormo, type FormoTheme } from 'formo-vue'
+import { defaultTheme, defineTheme, FormoForm, useFormo, type FormoClasses, type FormoTheme } from 'formo-vue'
+import FloatingField from '../components/FloatingField.vue'
+import HorizontalField from '../components/HorizontalField.vue'
 
-const presets: Record<string, { label: string; theme: Partial<FormoTheme>; wrapper: string }> = {
-  default: { label: 'Default', theme: {}, wrapper: '' },
+/** Themes that swap views — the DOM changes, not just the classes */
+const floating = defineTheme({ name: 'floating', extends: defaultTheme, views: { field: FloatingField } })
+const horizontal = defineTheme({
+  name: 'horizontal',
+  extends: defaultTheme,
+  views: { field: HorizontalField },
+  classes: { group: 'bg-white', groupBody: 'space-y-5' },
+})
+
+const presets: Record<string, { label: string; theme?: FormoTheme; classes?: Partial<FormoClasses>; wrapper?: string }> = {
+  default: { label: 'Default' },
+  floating: { label: 'Floating labels (views)', theme: floating },
+  horizontal: { label: 'Horizontal (views)', theme: horizontal },
   underline: {
-    label: 'Minimal underline',
-    wrapper: '',
-    theme: {
+    label: 'Minimal underline (classes)',
+    classes: {
       control: 'rounded-none border-0 border-b-2 border-slate-200 bg-transparent px-0 shadow-none focus:border-slate-900 focus:ring-0',
       controlInvalid: 'border-rose-500 focus:border-rose-600',
       label: 'text-[11px] font-semibold uppercase tracking-widest text-slate-500',
@@ -29,9 +45,9 @@ const presets: Record<string, { label: string; theme: Partial<FormoTheme>; wrapp
     },
   },
   midnight: {
-    label: 'Midnight',
+    label: 'Midnight (classes)',
     wrapper: 'rounded-2xl bg-slate-950 p-6 -m-1',
-    theme: {
+    classes: {
       label: 'text-slate-300',
       title: 'text-slate-300',
       control: 'border-slate-700 bg-slate-900 text-slate-100 placeholder:text-slate-500 focus:border-fuchsia-400 focus:ring-fuchsia-400/20',
@@ -52,22 +68,22 @@ const presets: Record<string, { label: string; theme: Partial<FormoTheme>; wrapp
 const preset = ref('default')
 const current = computed(() => presets[preset.value])
 
-const definition = Formo.form({ alias: 'themed' })
-  .add('full_name', { required: true, attr: { placeholder: 'Ada Lovelace' } })
-  .add('email', 'input|email', { required: true, message: 'We never share it.' })
-  .add(
-    Formo.group('preferences')
-      .addGroup('contact_by', 'radios', { email: 'Email', phone: 'Phone', pigeon: 'Carrier pigeon' }, 'email', { inline: true })
-      .add('digest', 'bool', true, { label: 'Weekly digest' }),
-  )
-  // Per-field classes win over the theme
-  .add('motto', {
-    classes: { control: 'font-serif italic' },
-    attr: { placeholder: 'Per-field classes: font-serif italic' },
-  })
-  .add('send', 'button', { label: 'Save preferences', attr: { type: 'submit' } })
-
-const form = useFormo(definition)
+const form = useFormo({
+  alias: 'themed',
+  fields: {
+    full_name: { required: true, attr: { placeholder: 'Ada Lovelace' } },
+    email: { driver: 'email', required: true, message: 'We never share it.' },
+    preferences: {
+      fields: {
+        contact_by: { driver: 'radios', opts: { email: 'Email', phone: 'Phone', pigeon: 'Carrier pigeon' }, val: 'email', inline: true },
+        digest: { driver: 'bool', val: true, label: 'Weekly digest' },
+      },
+    },
+    // Per-field classes win over the theme
+    motto: { classes: { control: 'font-serif italic' }, attr: { placeholder: 'Per-field classes: font-serif italic' } },
+    send: { driver: 'button', label: 'Save preferences', attr: { type: 'submit' } },
+  },
+})
 
 const submitted = ref<Record<string, unknown>>()
 </script>
@@ -89,7 +105,7 @@ const submitted = ref<Record<string, unknown>>()
       </div>
 
       <div :class="current.wrapper">
-        <FormoForm :form="form" :theme="current.theme" @submit="(values) => (submitted = values)" />
+        <FormoForm :form="form" :theme="current.theme" :classes="current.classes" @submit="(values) => (submitted = values)" />
       </div>
     </div>
 

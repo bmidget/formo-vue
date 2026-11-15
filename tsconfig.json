@@ -16,8 +16,22 @@
     "allowImportingTsExtensions": true,
     "types": ["vite/client", "node"],
     "paths": {
-      "formo-vue": ["./src/index.ts"]
+      "formo-vue": ["./src/index.ts"],
+      "formo-vue/nuxt-ui": ["./src/nuxt-ui/index.ts"],
+      "#components": ["./playground/stubs/nuxt-ui/index.ts"],
+      "@/components/ui/formo": ["./registry/shadcn-vue/formo/index.ts"],
+      "@/components/ui/*": ["./playground/stubs/shadcn-vue/ui/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "playground/**/*.ts", "playground/**/*.vue", "tests/**/*.ts", "scripts/**/*.ts", "*.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "playground/**/*.ts",
+    "playground/**/*.vue",
+    "registry/**/*.ts",
+    "registry/**/*.vue",
+    "tests/**/*.ts",
+    "scripts/**/*.ts",
+    "*.config.ts"
+  ]
 }

@@ -1,39 +1,50 @@
 <script setup lang="ts">
 /**
- * The Formo builder — the same fluent API as the PHP library:
+ * A form is one object: every field keyed by its alias, subforms nested under
+ * `fields`. Rules keep Formo's notations (Kohana arrays) or VeeValidate's.
  *
  *   $form = Formo::form(['alias' => 'signup'])
  *     ->add('username', ['rules' => [['not_empty'], ['min_length', [':value', 3]]]])
  *     ->add('email', 'input|email', ['required' => TRUE]) …
  *
+ * The PHP-style builder is there too — `Formo.form('signup').add('username', {…})`
+ * — and handy to change a form at runtime (see "Subforms & form objects").
+ *
  * `useFormo()` gives you the live form object: values, errors, validate(), load()…
  */
 import { ref } from 'vue'
-import { Formo, FormoForm, useFormo } from 'formo-vue'
+import { FormoForm, useFormo } from 'formo-vue'
 
-const form = useFormo(
-  Formo.form({ alias: 'signup' })
-    .add('username', {
+const form = useFormo({
+  alias: 'signup',
+  fields: {
+    username: {
       // Kohana rule arrays work as-is
       rules: [['not_empty'], ['min_length', [':value', 3]], ['alpha_dash']],
       message: 'Letters, numbers, dashes and underscores.',
       attr: { autocomplete: 'username' },
-    })
-    // 'driver|type' — just like Formo
-    .add('email', 'input|email', { required: true, attr: { placeholder: 'you@example.com' } })
+    },
+    // `driver: 'email'` is `input|email`, just like Formo
+    email: { driver: 'email', required: true, attr: { placeholder: 'you@example.com' } },
     // …and so do VeeValidate rule strings
-    .add('password', 'input|password', { rules: 'required|min:8' })
-    .add('password_confirm', 'input|password', {
+    password: { driver: 'password', rules: 'required|min:8' },
+    password_confirm: {
+      driver: 'password',
       label: 'Confirm password',
       rules: [['matches', [':validation', 'password_confirm', 'password']]],
-    })
-    .add('bio', 'textarea', { attr: { rows: 3, placeholder: 'Optional' }, filters: ['trim'] })
-    .add('agree', 'bool', false, {
+    },
+    // A string is just the driver
+    website: 'url',
+    bio: { driver: 'textarea', attr: { rows: 3, placeholder: 'Optional' }, filters: ['trim'] },
+    agree: {
+      driver: 'bool',
+      val: false,
       label: 'I agree to the terms and conditions',
       rules: [(value: boolean) => value === true || 'You must agree to continue'],
-    })
-    .add('save', 'button', { label: 'Create account', attr: { type: 'submit' } }),
-)
+    },
+    save: { driver: 'button', label: 'Create account', attr: { type: 'submit' } },
+  },
+})
 
 const submitted = ref<Record<string, unknown>>()
 

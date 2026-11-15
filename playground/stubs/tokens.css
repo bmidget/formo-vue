@@ -1,0 +1,54 @@
+/*
+ * Design tokens the Nuxt UI / shadcn-vue stubs and themes use. In an app, Nuxt
+ * UI's CSS (`@import "@nuxt/ui"`) and shadcn-vue's (its CSS variables) define them.
+ */
+
+/* ---- Nuxt UI: semantic colors and utilities ---------------------------------- */
+@theme {
+  --color-primary: var(--color-emerald-500);
+  --color-error: var(--color-red-500);
+  --color-success: var(--color-green-600);
+  --color-elevated: var(--color-slate-100);
+  --color-accented: var(--color-slate-300);
+  /* text-muted (Nuxt UI) — shadcn's `muted` is a background, re-scoped in .shadcn below */
+  --color-muted: var(--color-slate-500);
+}
+@utility text-default { color: var(--color-slate-700); }
+@utility text-dimmed { color: var(--color-slate-400); }
+@utility text-highlighted { color: var(--color-slate-900); }
+@utility text-inverted { color: var(--color-white); }
+@utility bg-default { background-color: var(--color-white); }
+@utility bg-inverted { background-color: var(--color-slate-900); }
+@utility ring-default { --tw-ring-color: var(--color-slate-200); }
+
+/* ---- shadcn-vue (new-york, neutral): tokens; `primary` / `muted` are scoped to .shadcn -- */
+@theme {
+  --color-background: var(--color-white);
+  --color-foreground: var(--color-neutral-950);
+  --color-primary-foreground: var(--color-white);
+  --color-secondary: var(--color-neutral-100);
+  --color-secondary-foreground: var(--color-neutral-900);
+  --color-muted-foreground: var(--color-neutral-500);
+  --color-accent: var(--color-neutral-100);
+  --color-accent-foreground: var(--color-neutral-900);
+  --color-popover: var(--color-white);
+  --color-popover-foreground: var(--color-neutral-950);
+  --color-destructive: var(--color-red-600);
+  --color-border: var(--color-neutral-200);
+  --color-input: var(--color-neutral-200);
+  --color-ring: var(--color-neutral-400);
+}
+.shadcn {
+  --color-primary: var(--color-neutral-900);
+  --color-muted: var(--color-neutral-100);
+  color: var(--color-foreground);
+}
+/* shadcn's base layer: borders take the border color (in @layer base, so utilities still win) */
+@layer base {
+  .shadcn,
+  .shadcn *,
+  .shadcn ::before,
+  .shadcn ::after {
+    border-color: var(--color-border);
+  }
+}

@@ -1,19 +1,20 @@
 import { twMerge } from 'tailwind-merge'
-import type { FormoTheme } from '../types'
+import { markRaw, toRaw } from 'vue'
+import type { ComponentRef, FormoClasses, FormoTheme, FormoThemeInput, FormoThemeLayer } from '../types'
 
 /**
- * The default Tailwind theme. Every element Formo renders takes its classes from
- * one of these keys, so restyling never requires touching a component:
+ * The classes of the built-in (Tailwind) theme. Every element the built-in
+ * views and controls render takes its classes from one of these keys:
  *
- *   createFormo({ theme: { control: 'rounded-none border-2' } })   // merged with tailwind-merge
- *   <FormoForm :theme="{ label: 'uppercase tracking-wide' }" />     // per form
- *   { alias: 'bio', classes: { control: 'font-mono' } }             // per field
- *   { alias: 'address', driver: 'group', theme: {...} }             // cascades into a group
+ *   createFormo({ classes: { control: 'rounded-none border-2' } })  // merged with tailwind-merge
+ *   <FormoForm :classes="{ label: 'uppercase tracking-wide' }" />    // per form
+ *   { alias: 'bio', classes: { control: 'font-mono' } }              // per field
+ *   { driver: 'group', theme: { classes: {...} } }                   // cascades into a group
  *
  * NOTE: Tailwind has to see these class names. Add the library to your sources:
  *   @source "../node_modules/formo-vue/src";
  */
-export const defaultTheme: FormoTheme = {
+export const defaultClasses: FormoClasses = {
   form: 'space-y-5',
   formError:
     'rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700',
@@ -26,6 +27,7 @@ export const defaultTheme: FormoTheme = {
   field: 'flex min-w-0 flex-col gap-1.5',
   fieldInline: 'flex flex-col gap-1',
   fieldBare: 'min-w-0',
+  fieldset: 'm-0 min-w-0 border-0 p-0',
 
   label: 'text-sm font-medium text-slate-700',
   labelInline: 'inline-flex cursor-pointer items-center gap-2.5 text-sm text-slate-700',
@@ -87,18 +89,178 @@ export const defaultTheme: FormoTheme = {
   checklistFailed: 'text-rose-600',
 }
 
-/** Merge theme layers; class strings of the same key are merged with tailwind-merge */
-export function mergeTheme(base: FormoTheme, ...layers: Array<Partial<FormoTheme> | undefined>): FormoTheme {
+/**
+ * The built-in views and controls in shadcn's design tokens (`border-input`,
+ * `text-muted-foreground`, `ring-ring`, `text-destructive`, `bg-primary`…) — a
+ * shadcn look for the vanilla controls, nothing to install:
+ *
+ *   createFormo({ theme: defineTheme({ name: 'shadcn', classes: shadcnClasses, mergeClasses: tailwindMergeClasses }) })
+ *
+ * The shadcn-vue registry item (`registry/r/formo.json`) builds on it with your
+ * own shadcn-vue components.
+ */
+export const shadcnClasses: FormoClasses = {
+  form: 'space-y-6',
+  formError: 'rounded-md border border-destructive/50 px-4 py-3 text-sm text-destructive',
+
+  group: 'min-w-0 space-y-4 rounded-xl border p-4 sm:p-6',
+  groupLegend: 'float-left w-full pb-4 text-base font-semibold leading-none [&+*]:clear-left',
+  groupBody: 'space-y-4',
+  groupError: 'text-sm font-medium text-destructive',
+
+  field: 'grid min-w-0 content-start gap-2',
+  fieldInline: 'grid content-start gap-2',
+  fieldBare: 'min-w-0',
+  fieldset: 'm-0 min-w-0 border-0 p-0',
+
+  label: 'text-sm leading-none font-medium select-none',
+  labelInline: 'flex items-center gap-3 text-sm leading-none font-medium',
+  required: 'text-destructive',
+  title: 'mb-1 text-sm leading-none font-medium',
+
+  control: [
+    'flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs md:text-sm',
+    'placeholder:text-muted-foreground outline-none transition-[color,box-shadow]',
+    'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+    'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+  ].join(' '),
+  controlInvalid: 'border-destructive ring-destructive/20',
+  select: 'pr-8',
+  textarea: 'h-auto min-h-16 py-2',
+  file: 'text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-secondary-foreground',
+  color: 'h-9 w-14 cursor-pointer rounded-md border border-input bg-transparent p-1',
+  range: 'w-full accent-primary',
+
+  checkbox: 'size-4 shrink-0 rounded-[4px] border-input accent-primary',
+  radio: 'size-4 shrink-0 accent-primary',
+  optionList: 'grid gap-3',
+  optionLabel: 'flex items-center gap-3 text-sm font-normal',
+  optionText: '',
+
+  help: 'text-sm text-muted-foreground',
+  error: 'text-sm text-destructive',
+  uneditable: 'py-2 text-sm',
+
+  button: [
+    'inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium shadow-xs transition-all',
+    'outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50',
+  ].join(' '),
+  buttonPrimary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+  buttonSecondary: 'border bg-background hover:bg-accent hover:text-accent-foreground',
+
+  blueprint: 'min-w-0 space-y-3',
+  blueprintRow: 'relative space-y-4 rounded-xl border p-4',
+  blueprintRowHeader: 'flex items-center justify-between text-sm font-medium text-muted-foreground',
+  blueprintRemove: 'rounded-md px-2 py-1 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-destructive',
+  blueprintAdd: 'inline-flex h-9 items-center gap-2 rounded-md border border-dashed px-4 text-sm font-medium hover:bg-accent',
+
+  errorSummary: 'rounded-lg border border-destructive/50 px-4 py-3 text-sm text-destructive',
+  errorList: 'list-disc space-y-1 pl-4 text-sm text-destructive',
+  ignored: 'opacity-50 transition-opacity',
+
+  checklist: 'space-y-1.5 rounded-md border bg-muted/50 px-3 py-2.5',
+  checklistItem: 'flex items-center gap-2 text-sm transition-colors',
+  checklistMet: 'text-foreground',
+  checklistUnmet: 'text-muted-foreground',
+  checklistFailed: 'text-destructive',
+}
+
+/** Every class key, empty — what a theme that isn't extending another starts from */
+const emptyClasses = Object.fromEntries(Object.keys(defaultClasses).map((k) => [k, ''])) as unknown as FormoClasses
+
+/** Class strings joined (no conflict resolution) — the default for non-Tailwind themes */
+export function joinClasses(...classes: Array<string | undefined>): string {
+  return classes.filter(Boolean).join(' ')
+}
+
+/** tailwind-merge, for the built-in theme */
+export function tailwindMergeClasses(...classes: Array<string | undefined>): string {
+  return twMerge(...classes.filter(Boolean) as string[])
+}
+
+/** Merge class maps: every key of each layer combined with the theme's `mergeClasses` */
+export function mergeClassMaps(
+  merge: (...classes: Array<string | undefined>) => string,
+  base: FormoClasses,
+  ...layers: Array<Partial<FormoClasses> | undefined>
+): FormoClasses {
   const out = { ...base }
   for (const layer of layers) {
     if (!layer) continue
-    for (const key of Object.keys(layer) as Array<keyof FormoTheme>) {
+    for (const key of Object.keys(layer) as Array<keyof FormoClasses>) {
       const value = layer[key]
       if (value === undefined) continue
-      out[key] = twMerge(out[key], value)
+      out[key] = merge(out[key], value)
     }
   }
   return out
+}
+
+/** Components must never be reactive */
+export function rawComponents<T extends Record<string, ComponentRef | undefined>>(map: T | undefined): T {
+  const out: Record<string, ComponentRef | undefined> = {}
+  for (const [key, value] of Object.entries(toRaw(map ?? {})) as Array<[string, ComponentRef | undefined]>) {
+    out[key] = value && typeof value === 'object' ? markRaw(toRaw(value)) : value
+  }
+  return out as T
+}
+
+export function isTheme(value: unknown): value is FormoTheme {
+  return !!value && typeof value === 'object' && (value as FormoTheme).__formoTheme === true
+}
+
+const LAYER_KEYS = new Set(['views', 'components', 'classes'])
+const warnedLayers = new WeakSet<object>()
+
+/** A theme layer (`{ views, components, classes }`) — warns about anything else (ex: a flat class map) */
+export function asThemeLayer(value: unknown): FormoThemeLayer | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  if (import.meta.env?.DEV && !warnedLayers.has(toRaw(value))) {
+    warnedLayers.add(toRaw(value))
+    const unknown = Object.keys(value).filter((k) => !LAYER_KEYS.has(k))
+    if (unknown.length) {
+      console.warn(
+        `[formo] theme: unknown key(s) ${unknown.join(', ')}. A theme is made with defineTheme(), ` +
+          'or is a layer of overrides: { views, components, classes }. Class overrides go in `classes`.',
+      )
+    }
+  }
+  return value as FormoThemeLayer
+}
+
+/**
+ * Define a theme — Formo's template directory: the views that lay forms out,
+ * the controls, and the classes they use.
+ *
+ * ```ts
+ * export const bootstrap = defineTheme({
+ *   name: 'bootstrap',
+ *   views: { field: BsField, inline: BsCheck, error: BsFeedback, floating: BsFloating },
+ *   components: { select: BsSelect },
+ *   classes: { control: 'form-control', controlInvalid: 'is-invalid', label: 'form-label' },
+ * })
+ * app.use(createFormo({ theme: bootstrap }))
+ * ```
+ *
+ * A theme's classes *replace* the built-in Tailwind ones (keys you don't give are
+ * empty); views you don't give fall back to the built-in views. With `extends`,
+ * you start from another theme instead: its views/components are kept and your
+ * classes merge over its classes.
+ */
+export function defineTheme(input: FormoThemeInput): FormoTheme {
+  const parent = input.extends
+  const mergeClasses = input.mergeClasses ?? parent?.mergeClasses ?? joinClasses
+  const classes = parent
+    ? mergeClassMaps(parent.mergeClasses, parent.classes, input.classes)
+    : { ...emptyClasses, ...(input.classes ?? {}) }
+  return markRaw({
+    name: input.name ?? (parent ? `${parent.name}+` : 'custom'),
+    views: { ...(parent?.views ?? {}), ...rawComponents(input.views) },
+    components: { ...(parent?.components ?? {}), ...rawComponents(input.components) },
+    classes,
+    mergeClasses,
+    __formoTheme: true as const,
+  })
 }
 
 /** `cx('a', cond && 'b', ['c'])` + tailwind-merge */

@@ -3,9 +3,14 @@
  * Blueprints: a group whose fields are the template for repeatable rows.
  * Formo (PHP): `'blueprint' => TRUE` + `$form->pad_blueprint($rows)`.
  * Values are arrays of row objects; names look like `profile[phones][0][number]`.
+ *
+ * Rendered by the theme (phones), or by your own markup (education, below):
+ * the default slot gets `{ rows, add, remove, canAdd, canRemove }`, each row a
+ * handle — `row.fields.school`, `row.remove()`, `row.key` for v-for. The same
+ * handles work anywhere: `form.fields.education.rows`, `.add()`.
  */
 import { ref } from 'vue'
-import { Formo, FormoForm, useFormo } from 'formo-vue'
+import { Formo, FormoErrors, FormoForm, FormoHelp, FormoInput, FormoLabel, useFormo } from 'formo-vue'
 
 const phoneTypes = { mobile: 'Mobile', home: 'Home', work: 'Work' }
 
@@ -45,7 +50,46 @@ const submitted = ref<Record<string, unknown>>()
 <template>
   <div class="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
     <div>
-      <FormoForm :form="form" @submit="(values) => (submitted = values)" />
+      <FormoForm :form="form" @submit="(values) => (submitted = values)">
+        <!-- Your own markup for a whole repeatable group (the automatic layout renders the rest) -->
+        <template #field:education="{ rows, add, canAdd }">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <FormoLabel />
+              <button
+                type="button"
+                :disabled="!canAdd"
+                class="rounded-md px-2 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
+                @click="add()"
+              >
+                + Add school
+              </button>
+            </div>
+            <FormoHelp />
+            <table v-if="rows.length" class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-xs text-slate-500">
+                  <th class="pb-1 font-medium">School</th>
+                  <th class="w-32 pb-1 font-medium">Graduated</th>
+                  <th class="w-8" />
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in rows" :key="row.key" class="align-top">
+                  <td class="pr-2 pb-2">
+                    <FormoInput :field="row.fields.school" />
+                    <FormoErrors :field="row.fields.school" />
+                  </td>
+                  <td class="pr-2 pb-2"><FormoInput :field="row.fields.graduated" /></td>
+                  <td class="pb-2">
+                    <button type="button" class="px-2 py-2 text-slate-400 hover:text-rose-600" aria-label="Remove" @click="row.remove()">×</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </FormoForm>
     </div>
 
     <aside class="space-y-4 text-xs">

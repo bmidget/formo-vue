@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Renders a list of nodes (the `foreach ($field->as_array() as $_field)` loop of
- * Formo's form/group templates). Use it in custom group components.
+ * Formo's form/group templates) (internal).
  */
 import type { FieldNode } from '../types'
 import { joinPath } from '../core/utils'

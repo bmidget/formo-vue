@@ -14,6 +14,8 @@ import OptionalSubforms from './OptionalSubforms.vue'
 import I18n from './I18n.vue'
 import Laravel from './Laravel.vue'
 import Layouts from './Layouts.vue'
+import NuxtUi from './NuxtUi.vue'
+import ShadcnVue from './ShadcnVue.vue'
 
 /** Raw sources, shown in the "Source" tab */
 const sources = import.meta.glob('./*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
@@ -32,7 +34,7 @@ const list: Array<Omit<Example, 'file'> & { file: string }> = [
     id: 'getting-started',
     title: 'Getting started',
     section: 'Basics',
-    summary: 'The Formo builder — same fluent API as the PHP library — rendered by <FormoForm>, with the live form values and errors next to it.',
+    summary: 'A form defined as one object (or with the PHP-style builder), rendered by <FormoForm>, with the live form values and errors next to it.',
     file: 'GettingStarted.vue',
     component: GettingStarted,
   },
@@ -48,7 +50,7 @@ const list: Array<Omit<Example, 'file'> & { file: string }> = [
     id: 'layouts',
     title: 'Render parts anywhere',
     section: 'Basics',
-    summary: 'Your own layout: render subforms, fields, just the input, label or error — anywhere, even outside the <form> — like Formo’s render() at every level.',
+    summary: 'Your own layout with form.fields handles: render subforms and fields anywhere (even outside the <form>), wrap a control with a slot, or lay out one field yourself.',
     file: 'Layouts.vue',
     component: Layouts,
   },
@@ -104,7 +106,7 @@ const list: Array<Omit<Example, 'file'> & { file: string }> = [
     id: 'custom-components',
     title: 'Custom components',
     section: 'Customizing',
-    summary: 'Override the component of any field: per field, per driver, by name, via slots — plus custom wrappers and new drivers.',
+    summary: 'Override the component of any field: per field, per driver, by name, via slots that wrap or replace the control — plus custom views and new drivers.',
     file: 'CustomComponents.vue',
     component: CustomComponents,
   },
@@ -112,7 +114,7 @@ const list: Array<Omit<Example, 'file'> & { file: string }> = [
     id: 'theming',
     title: 'Theming',
     section: 'Customizing',
-    summary: 'Tailwind theme keys merged with tailwind-merge — app-wide, per form, per group or per field.',
+    summary: 'Themes swap the views (Formo’s PHP templates), controls and classes — floating labels, horizontal forms — or just restyle with class overrides.',
     file: 'Theming.vue',
     component: Theming,
   },
@@ -123,6 +125,22 @@ const list: Array<Omit<Example, 'file'> & { file: string }> = [
     summary: 'Switch languages live: labels, options, placeholders, messages, checklists and UI strings — built-in en/fr/es/de/nl plus any @vee-validate/i18n locale.',
     file: 'I18n.vue',
     component: I18n,
+  },
+  {
+    id: 'nuxt-ui',
+    title: 'Nuxt UI',
+    section: 'UI libraries',
+    summary: 'formo-vue/nuxt-ui: every field in a UFormField with Nuxt UI controls — USelectMenu / USwitch swapped in by name, parts in your own markup.',
+    file: 'NuxtUi.vue',
+    component: NuxtUi,
+  },
+  {
+    id: 'shadcn-vue',
+    title: 'shadcn-vue',
+    section: 'UI libraries',
+    summary: 'The formo registry item: your shadcn-vue components as Formo’s controls, in shadcn’s field layout — or just the look, with shadcnClasses.',
+    file: 'ShadcnVue.vue',
+    component: ShadcnVue,
   },
   {
     id: 'blueprints',

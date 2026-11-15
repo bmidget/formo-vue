@@ -1,8 +1,8 @@
 import { computed, provide, watchEffect, type ComputedRef } from 'vue'
-import type { FieldNode, FormoResolvedOptions, FormoTheme } from '../types'
-import { applyLayer, FormoOptionsKey, injectController, injectFormoOptions } from './context'
+import type { FieldNode, FormoClasses, FormoResolvedOptions } from '../types'
+import { applyLayer, FormoOptionsKey, injectController, injectFormoOptions, nodeClasses, type FormoGroupState } from './context'
+import { getTranslator } from '../i18n/translator'
 import { resolveLabel } from '../core/labels'
-import { mergeTheme } from '../core/theme'
 import { groupNamespaces } from '../core/values'
 
 export interface GroupProps {
@@ -14,12 +14,11 @@ export interface GroupProps {
 }
 
 /**
- * Shared setup for group-like components (FormoGroup, FormoBlueprint, or your
- * own group component): cascades the group's `components` / `config` / `theme`
+ * Shared setup of the group / blueprint engines: cascades the group's `components` / `config` / `theme`
  * to its children, registers the group with the form, and exposes its label,
  * error and the value prefix for its children.
  */
-export function useGroupSetup(props: GroupProps) {
+export function useGroupSetup(props: GroupProps, getState?: () => FormoGroupState) {
   const form = injectController()
   const parentOptions = injectFormoOptions()
 
@@ -37,7 +36,8 @@ export function useGroupSetup(props: GroupProps) {
     props.node.blueprint || groupNamespaces(props.node, parentOptions.value.config) ? props.path : props.parentPath,
   )
 
-  const theme: ComputedRef<FormoTheme> = computed(() => mergeTheme(options.value.theme, props.node.classes))
+  /** Classes for the group itself: the cascaded ones + its own `classes` */
+  const classes: ComputedRef<FormoClasses> = computed(() => nodeClasses(options.value, props.node.classes))
   const label = computed(() => resolveLabel(props.node, props.path, options.value.config, props.parentAlias))
   const error = computed(() => form.error(props.path))
   /** Fully optional right now (`ignore` condition, a parent, or another field's `ignores`) */
@@ -53,9 +53,16 @@ export function useGroupSetup(props: GroupProps) {
         groupPath: props.groupPath ?? '',
         kind: 'group',
         label: () => label.value,
+        // Lets <FormoLabel :field="form.fields.address" /> & co. render its pieces anywhere
+        get groupState() {
+          return getState?.()
+        },
       }),
     )
   })
 
-  return { form, options, childPrefix, theme, label, error, ignored }
+  /** Help text (translated) */
+  const message = computed(() => (props.node.message ? getTranslator(options.value.config).text(props.node.message) : undefined))
+
+  return { form, options, childPrefix, classes, label, message, error, ignored }
 }

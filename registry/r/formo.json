@@ -1,0 +1,82 @@
+{
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json",
+  "name": "formo",
+  "type": "registry:block",
+  "title": "Formo",
+  "description": "Formo (formo-vue) forms rendered with your shadcn-vue components: a theme with shadcn field views (label, description, message) and controls (Input, Textarea, Select, Checkbox, Switch, RadioGroup). Use it with createFormo({ theme: shadcnTheme }).",
+  "dependencies": [
+    "formo-vue",
+    "vee-validate"
+  ],
+  "registryDependencies": [
+    "input",
+    "textarea",
+    "label",
+    "select",
+    "checkbox",
+    "switch",
+    "radio-group"
+  ],
+  "files": [
+    {
+      "path": "registry/shadcn-vue/formo/FormoCheckboxGroup.vue",
+      "type": "registry:ui",
+      "target": "components/ui/formo/FormoCheckboxGroup.vue",
+      "content": "<script setup lang=\"ts\">\n/** A field's `checkboxes` (an array), with your shadcn-vue Checkbox */\nimport { computed } from 'vue'\nimport { flattenOptions, useFormoField } from 'formo-vue'\nimport { Checkbox } from '@/components/ui/checkbox'\nimport { Label } from '@/components/ui/label'\n\ndefineOptions({ inheritAttrs: false })\nconst props = defineProps<{ modelValue?: unknown }>()\nconst emit = defineEmits<{ 'update:modelValue': [value: unknown[]] }>()\n\nconst field = useFormoField()\nconst options = computed(() => flattenOptions(field.options))\nconst selected = computed<unknown[]>(() => (Array.isArray(props.modelValue) ? props.modelValue : []))\nconst itemId = (i: number) => `${field.id || field.name}-${i}`\n\nfunction toggle(value: unknown, checked: boolean) {\n  // Keep the options' order, whatever the click order\n  emit('update:modelValue', options.value.map((o) => o.value).filter((v) => (v === value ? checked : selected.value.includes(v))))\n}\n</script>\n\n<template>\n  <div v-bind=\"{ ...$attrs, name: undefined }\" role=\"group\" :class=\"field.node.vars.inline ? 'flex flex-wrap gap-x-6 gap-y-3' : 'grid gap-3'\">\n    <div v-for=\"(opt, i) in options\" :key=\"String(opt.value)\" class=\"flex items-center gap-3\">\n      <Checkbox\n        :id=\"itemId(i)\"\n        :name=\"`${field.name}[]`\"\n        :value=\"String(opt.value)\"\n        :model-value=\"selected.includes(opt.value)\"\n        :disabled=\"opt.disabled || field.disabled\"\n        :aria-invalid=\"field.invalid || undefined\"\n        @update:model-value=\"toggle(opt.value, !!$event)\"\n      />\n      <Label :for=\"itemId(i)\" class=\"font-normal\">{{ opt.label }}</Label>\n    </div>\n  </div>\n</template>\n"
+    },
+    {
+      "path": "registry/shadcn-vue/formo/FormoErrorsView.vue",
+      "type": "registry:ui",
+      "target": "components/ui/formo/FormoErrorsView.vue",
+      "content": "<script setup lang=\"ts\">\n/**\n * The `errors` view — like shadcn's FormMessage, with Formo's error display:\n * the first message, all of them (`errorDisplay: 'all'`), or what a checklist doesn't already show.\n */\nimport { computed, useAttrs } from 'vue'\nimport { cx, type FormoFieldState } from 'formo-vue'\n\ndefineOptions({ inheritAttrs: false })\nconst props = defineProps<{ formo: FormoFieldState }>()\nconst attrs = useAttrs()\n\nconst visibleError = computed(() => {\n  const { error, errors, errorDisplay, checklist } = props.formo\n  if (!error || errorDisplay !== 'checklist') return error\n  const listed = new Set(checklist.map((item) => item.message))\n  return errors.find((message) => !listed.has(message))\n})\n</script>\n\n<template>\n  <ul\n    v-if=\"formo.errorDisplay === 'all' && formo.errors.length > 1\"\n    v-bind=\"attrs\"\n    :id=\"formo.errorId\"\n    data-slot=\"form-message\"\n    :class=\"cx(formo.classes.errorList, attrs.class)\"\n    role=\"alert\"\n  >\n    <li v-for=\"message in formo.errors\" :key=\"message\">{{ message }}</li>\n  </ul>\n  <p v-else-if=\"visibleError\" v-bind=\"attrs\" :id=\"formo.errorId\" data-slot=\"form-message\" :class=\"cx(formo.classes.error, attrs.class)\" role=\"alert\">\n    {{ visibleError }}\n  </p>\n</template>\n"
+    },
+    {
+      "path": "registry/shadcn-vue/formo/FormoFieldView.vue",
+      "type": "registry:ui",
+      "target": "components/ui/formo/FormoFieldView.vue",
+      "content": "<script setup lang=\"ts\">\n/**\n * The `field` view: label, control, description, checklist, message — like\n * shadcn's FormItem, with Formo's ids / aria (`aria-invalid` styles the controls).\n */\nimport type { FormoFieldState } from 'formo-vue'\n\ndefineProps<{ formo: FormoFieldState }>()\n</script>\n\n<template>\n  <div data-slot=\"form-item\" :class=\"formo.classes.field\" :data-formo-driver=\"formo.node.driver\" :data-invalid=\"formo.invalid || undefined\">\n    <slot name=\"label\" />\n    <slot name=\"input\" />\n    <slot name=\"help\" />\n    <slot name=\"checklist\" />\n    <slot name=\"errors\" />\n  </div>\n</template>\n"
+    },
+    {
+      "path": "registry/shadcn-vue/formo/FormoHelpView.vue",
+      "type": "registry:ui",
+      "target": "components/ui/formo/FormoHelpView.vue",
+      "content": "<script setup lang=\"ts\">\n/** The `help` view — like shadcn's FormDescription */\nimport { useAttrs } from 'vue'\nimport { cx, type FormoFieldState } from 'formo-vue'\n\ndefineOptions({ inheritAttrs: false })\ndefineProps<{ formo: FormoFieldState }>()\nconst attrs = useAttrs()\n</script>\n\n<template>\n  <p v-if=\"formo.message\" v-bind=\"attrs\" :id=\"formo.helpId\" data-slot=\"form-description\" :class=\"cx(formo.classes.help, attrs.class)\">\n    {{ formo.message }}\n  </p>\n</template>\n"
+    },
+    {
+      "path": "registry/shadcn-vue/formo/FormoInlineView.vue",
+      "type": "registry:ui",
+      "target": "components/ui/formo/FormoInlineView.vue",
+      "content": "<script setup lang=\"ts\">\n/** The `inline` view (checkbox, switch): the control, then its label, side by side */\nimport type { FormoFieldState } from 'formo-vue'\n\ndefineProps<{ formo: FormoFieldState }>()\n</script>\n\n<template>\n  <div data-slot=\"form-item\" :class=\"formo.classes.fieldInline\" :data-formo-driver=\"formo.node.driver\" :data-invalid=\"formo.invalid || undefined\">\n    <div class=\"flex items-center gap-3\">\n      <slot name=\"input\" />\n      <slot name=\"label\" />\n    </div>\n    <slot name=\"help\" />\n    <slot name=\"checklist\" />\n    <slot name=\"errors\" />\n  </div>\n</template>\n"
+    },
+    {
+      "path": "registry/shadcn-vue/formo/FormoLabelView.vue",
+      "type": "registry:ui",
+      "target": "components/ui/formo/FormoLabelView.vue",
+      "content": "<script setup lang=\"ts\">\n/**\n * The `label` view — your shadcn-vue <Label>, wired to the control (`for`), red\n * when the field is invalid (like FormLabel). `as=\"legend\"` for radio groups.\n */\nimport { computed, useAttrs } from 'vue'\nimport { cx, type FormoFieldState } from 'formo-vue'\nimport { Label } from '@/components/ui/label'\n\ndefineOptions({ inheritAttrs: false })\nconst props = withDefaults(defineProps<{ formo: FormoFieldState; as?: 'label' | 'legend' | 'span' }>(), { as: 'label' })\nconst attrs = useAttrs()\nconst marker = computed(() => props.formo.form.options.config.requiredMarker)\n/** Attributes given by a view or your template (`<FormoLabel class=\"…\">`), class merged */\nconst rest = () => {\n  const { class: _class, ...others } = attrs\n  return others\n}\n</script>\n\n<template>\n  <template v-if=\"formo.label\">\n    <Label\n      v-if=\"as === 'label'\"\n      v-bind=\"rest()\"\n      :for=\"formo.id || undefined\"\n      :data-error=\"formo.invalid || undefined\"\n      :class=\"cx('data-[error=true]:text-destructive', attrs.class)\"\n    >\n      <!-- one span: shadcn's Label is `flex gap-2`, the marker stays next to the text -->\n      <span>{{ formo.label }}<span v-if=\"formo.required && marker\" :class=\"formo.classes.required\" aria-hidden=\"true\">{{ marker }}</span></span>\n    </Label>\n    <component :is=\"as\" v-else v-bind=\"rest()\" :class=\"cx(as === 'legend' ? formo.classes.title : '', attrs.class)\">\n      {{ formo.label }}<span v-if=\"formo.required && marker\" :class=\"formo.classes.required\" aria-hidden=\"true\">{{ marker }}</span>\n    </component>\n  </template>\n</template>\n"
+    },
+    {
+      "path": "registry/shadcn-vue/formo/FormoRadioGroup.vue",
+      "type": "registry:ui",
+      "target": "components/ui/formo/FormoRadioGroup.vue",
+      "content": "<script setup lang=\"ts\">\n/** A field's `radios`, with your shadcn-vue RadioGroup (`inline: true` lays them out in a row) */\nimport { computed } from 'vue'\nimport { flattenOptions, useFormoField } from 'formo-vue'\nimport { Label } from '@/components/ui/label'\nimport { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'\n\ndefineOptions({ inheritAttrs: false })\ndefineProps<{ modelValue?: unknown }>()\nconst emit = defineEmits<{ 'update:modelValue': [value: unknown] }>()\n\nconst field = useFormoField()\nconst options = computed(() => flattenOptions(field.options))\nconst itemId = (i: number) => `${field.id || field.name}-${i}`\n</script>\n\n<template>\n  <RadioGroup\n    v-bind=\"{ ...$attrs, name: undefined }\"\n    :model-value=\"modelValue\"\n    :name=\"field.name\"\n    :disabled=\"field.disabled\"\n    :required=\"field.required\"\n    :class=\"field.node.vars.inline ? 'flex flex-wrap gap-x-6' : undefined\"\n    @update:model-value=\"emit('update:modelValue', $event)\"\n  >\n    <div v-for=\"(opt, i) in options\" :key=\"String(opt.value)\" class=\"flex items-center gap-3\">\n      <RadioGroupItem :id=\"itemId(i)\" :value=\"opt.value\" :disabled=\"opt.disabled\" :aria-invalid=\"field.invalid || undefined\" />\n      <Label :for=\"itemId(i)\" class=\"font-normal\">{{ opt.label }}</Label>\n    </div>\n  </RadioGroup>\n</template>\n"
+    },
+    {
+      "path": "registry/shadcn-vue/formo/FormoSelect.vue",
+      "type": "registry:ui",
+      "target": "components/ui/formo/FormoSelect.vue",
+      "content": "<script setup lang=\"ts\">\n/**\n * A field's `select`, with your shadcn-vue Select: options and optgroups from\n * the field, `blank` as the placeholder, `multiple` from `attr.multiple`.\n */\nimport { computed } from 'vue'\nimport { getTranslator, isOptionGroup, useFormoField } from 'formo-vue'\nimport { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'\n\ndefineOptions({ inheritAttrs: false })\ndefineProps<{ modelValue?: unknown }>()\nconst emit = defineEmits<{ 'update:modelValue': [value: unknown]; blur: [] }>()\n\nconst field = useFormoField()\nconst placeholder = computed(() => {\n  const blank = field.node.blank\n  return typeof blank === 'string' ? getTranslator(field.form.options.config).text(blank) : undefined\n})\n</script>\n\n<template>\n  <Select\n    :model-value=\"modelValue ?? undefined\"\n    :name=\"field.name\"\n    :multiple=\"!!field.node.attr.multiple\"\n    :disabled=\"field.disabled\"\n    :required=\"field.required\"\n    @update:model-value=\"emit('update:modelValue', $event)\"\n    @update:open=\"(open: boolean) => !open && emit('blur')\"\n  >\n    <!-- id and aria-* (invalid, describedby) go on the trigger — the element the label points to -->\n    <SelectTrigger v-bind=\"{ ...$attrs, name: undefined }\" class=\"w-full\">\n      <SelectValue :placeholder=\"placeholder\" />\n    </SelectTrigger>\n    <SelectContent>\n      <template v-for=\"(item, i) in field.options\" :key=\"i\">\n        <SelectGroup v-if=\"isOptionGroup(item)\">\n          <SelectLabel>{{ item.label }}</SelectLabel>\n          <SelectItem v-for=\"opt in item.options\" :key=\"String(opt.value)\" :value=\"opt.value\" :disabled=\"opt.disabled\">{{ opt.label }}</SelectItem>\n        </SelectGroup>\n        <SelectItem v-else :value=\"item.value\" :disabled=\"item.disabled\">{{ item.label }}</SelectItem>\n      </template>\n    </SelectContent>\n  </Select>\n</template>\n"
+    },
+    {
+      "path": "registry/shadcn-vue/formo/theme.ts",
+      "type": "registry:ui",
+      "target": "components/ui/formo/theme.ts",
+      "content": "/**\n * Formo × shadcn-vue — your shadcn-vue components as Formo's controls, in\n * shadcn's field layout. Installed by the `formo` registry item; it's yours:\n * edit anything.\n *\n *   app.use(createFormo({ theme: shadcnTheme }))        // or <FormoForm :theme=\"shadcnTheme\">\n *\n * Swap controls by name: `{ driver: 'bool', component: 'switch' }` (one field),\n * `components: { checkbox: 'switch' }` (a form, a group, the app).\n */\nimport { defineControl, defineTheme, FormoInputControl, shadcnClasses, tailwindMergeClasses } from 'formo-vue'\nimport { Checkbox } from '@/components/ui/checkbox'\nimport { Input } from '@/components/ui/input'\nimport { Switch } from '@/components/ui/switch'\nimport { Textarea } from '@/components/ui/textarea'\nimport FormoCheckboxGroup from './FormoCheckboxGroup.vue'\nimport FormoErrorsView from './FormoErrorsView.vue'\nimport FormoFieldView from './FormoFieldView.vue'\nimport FormoHelpView from './FormoHelpView.vue'\nimport FormoInlineView from './FormoInlineView.vue'\nimport FormoLabelView from './FormoLabelView.vue'\nimport FormoRadioGroup from './FormoRadioGroup.vue'\nimport FormoSelect from './FormoSelect.vue'\n\nexport const shadcnTheme = defineTheme({\n  name: 'shadcn-vue',\n  views: {\n    field: FormoFieldView,\n    inline: FormoInlineView,\n    label: FormoLabelView,\n    help: FormoHelpView,\n    errors: FormoErrorsView,\n    // fieldset (radios, checkbox lists), groups, repeatable rows, checklists…: Formo's own views, in shadcn classes\n  },\n  components: {\n    // Inputs style themselves from `aria-invalid`; Formo passes `type`, `id`, `name`, `aria-*`\n    input: defineControl({ component: Input, native: true }),\n    textarea: defineControl({ component: Textarea, native: true }),\n    select: defineControl({ component: FormoSelect, native: true }),\n    checkbox: defineControl({ component: Checkbox, native: true }),\n    radios: defineControl({ component: FormoRadioGroup, native: true }),\n    checkboxes: defineControl({ component: FormoCheckboxGroup, native: true }),\n    // MySQL SET: a comma-separated string in, an array for the checkboxes\n    set: defineControl({\n      component: FormoCheckboxGroup,\n      model: {\n        get: (value) => String(value ?? '').split(',').filter(Boolean),\n        set: (value) => (Array.isArray(value) ? value.map(String).join(',') : ''),\n      },\n    }),\n    // By name: `component: 'switch'`, `components: { checkbox: 'switch' }`\n    switch: defineControl({ component: Switch, native: true }),\n    // No shadcn-vue equivalent: Formo's own, in shadcn classes\n    'input|hidden': FormoInputControl,\n    'input|range': FormoInputControl,\n    'input|color': FormoInputControl,\n    'input|submit': FormoInputControl,\n    'input|reset': FormoInputControl,\n    'input|button': FormoInputControl,\n    'input|image': FormoInputControl,\n  },\n  classes: shadcnClasses,\n  mergeClasses: tailwindMergeClasses,\n})\n"
+    },
+    {
+      "path": "registry/shadcn-vue/formo/index.ts",
+      "type": "registry:ui",
+      "target": "components/ui/formo/index.ts",
+      "content": "export { shadcnTheme } from './theme'\nexport { default as FormoFieldView } from './FormoFieldView.vue'\nexport { default as FormoInlineView } from './FormoInlineView.vue'\nexport { default as FormoLabelView } from './FormoLabelView.vue'\nexport { default as FormoHelpView } from './FormoHelpView.vue'\nexport { default as FormoErrorsView } from './FormoErrorsView.vue'\nexport { default as FormoSelect } from './FormoSelect.vue'\nexport { default as FormoRadioGroup } from './FormoRadioGroup.vue'\nexport { default as FormoCheckboxGroup } from './FormoCheckboxGroup.vue'\n"
+    }
+  ]
+}

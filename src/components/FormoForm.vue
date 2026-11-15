@@ -14,14 +14,16 @@
  *     <FormoRender path="email" />  <FormoRender path="address" />  <FormoRest />
  *   </FormoForm>
  *
- * Override any nested field from the template:
- *   <template #control:rating="field"> ...replaces the control, keeps label/errors... </template>
- *   <template #field:address.zip="field"> ...replaces the whole field... </template>
+ * Put things around any region of any field from the template (`label`, `input`,
+ * `help`, `error`, `checklist`) — each slot gets the region's default rendering:
+ *   <template #input:price="{ Input }"> <span>$</span> <component :is="Input" /> </template>
+ *   <template #field:address.zip="{ Label, Input }"> ...your own layout for that field... </template>
  */
-import { computed, h, nextTick, onBeforeUnmount, onMounted, provide, ref, useSlots, watch, watchEffect } from 'vue'
+import { computed, h, markRaw, nextTick, onBeforeUnmount, onMounted, provide, ref, useSlots, watch, watchEffect } from 'vue'
 import { FormContextKey } from 'vee-validate'
 import type {
   ComponentRef,
+  FormoClasses,
   FormoConfig,
   FormoController,
   FormoDefinition,
@@ -30,6 +32,8 @@ import type {
   FormoResponse,
   FormoSubmitContext,
   FormoTheme,
+  FormoThemeLayer,
+  FormoViews,
   RuleFn,
 } from '../types'
 import {
@@ -38,14 +42,17 @@ import {
   FormoOptionsKey,
   FormoContainerKey,
   FormoSlotsKey,
+  nodeClasses,
+  type FormoFormState,
 } from '../composables/context'
 import { leafPaths } from '../core/locate'
 import { hasContent } from './slots'
 import { useFormo } from '../composables/useFormo'
 import { csrfField } from '../http/csrf'
-import { cx, mergeTheme } from '../core/theme'
+import { cx } from '../core/theme'
 import { deepClone, deepEqual } from '../core/utils'
 import FormoChildren from './FormoChildren.vue'
+import { nodeView } from './resolve'
 
 const props = withDefaults(
   defineProps<{
@@ -53,12 +60,17 @@ const props = withDefaults(
     form: FormoDefinition | FormoController
     /** Form values (v-model). Merged over the definition's `val`s */
     modelValue?: Record<string, any>
-    /** Component overrides for this form (cascades into groups) */
+    /** A theme for this form (`defineTheme()`), or overrides: `{ views, components, classes }` */
+    theme?: FormoTheme | FormoThemeLayer
+    /** View overrides for this form (cascades into groups) */
+    views?: Partial<FormoViews>
+    /** Control overrides for this form (cascades into groups) */
     components?: Record<string, ComponentRef>
+    /** Class overrides for this form (cascades into groups) */
+    classes?: Partial<FormoClasses>
     drivers?: Record<string, FormoDriver>
     rules?: Record<string, RuleFn>
     config?: Partial<FormoConfig>
-    theme?: Partial<FormoTheme>
     /** Disable every control */
     disabled?: boolean
     /** After validation passes, submit the <form> natively to its `action` */
@@ -87,21 +99,25 @@ function isController(value: unknown): value is FormoController {
 const controller: FormoController = isController(props.form)
   ? props.form
   : useFormo(() => props.form as FormoDefinition, {
+      theme: props.theme,
+      views: props.views,
       components: props.components,
+      classes: props.classes,
       drivers: props.drivers,
       rules: props.rules,
       config: props.config,
-      theme: props.theme,
       initialValues: props.modelValue,
     })
 
 const options = computed(() =>
   applyLayer(controller._baseOptions, {
+    theme: props.theme,
+    views: props.views,
     components: props.components,
+    classes: props.classes,
     drivers: props.drivers,
     rules: props.rules,
     config: props.native ? { ...props.config, native: true } : props.config,
-    theme: props.theme,
   }),
 )
 
@@ -115,7 +131,7 @@ provide(FormoSlotsKey, slots)
 provide(FormoContainerKey, () => ({ path: '', prefix: '' }))
 
 const root = computed(() => controller.root)
-const theme = computed(() => mergeTheme(options.value.theme, root.value.classes))
+const classes = computed(() => nodeClasses(options.value, root.value.classes))
 
 // The form itself is a node: it can have rules and callbacks (Formo form-level rules)
 watchEffect((onCleanup) => {
@@ -179,6 +195,8 @@ onMounted(async () => {
   const missing = leafPaths(root.value, drivers, config)
     .filter((l) => l.node.render === true && l.ancestors.every((a) => a.render === true))
     .filter((l) => !controller.find(l.path))
+    // A repeatable group rendered row by row (its rows' fields placed by hand)
+    .filter((l) => !(l.node.blueprint && [...controller._claimed].some((p) => p.startsWith(`${l.path}[`))))
     .map((l) => l.path)
   if (missing.length) {
     console.warn(
@@ -228,10 +246,25 @@ const formAttrs = computed<Record<string, unknown>>(() => {
   }
 })
 
-const formError = computed(() => controller.error(''))
+const formState: FormoFormState = markRaw({
+  form: controller,
+  get error() {
+    return controller.error('')
+  },
+  get classes() {
+    return classes.value
+  },
+  get fields() {
+    return controller.fields
+  },
+})
+
+/** The `form` view (`view` on the root definition, the theme's, or the built-in one) */
+const FormView = computed(() => nodeView(root.value, 'form', options.value))
 
 const slotProps = computed(() => ({
   form: controller,
+  fields: controller.fields,
   values: controller.values,
   errors: controller.errors,
   valid: controller.valid,
@@ -268,12 +301,19 @@ defineExpose({ form: controller })
       <input v-if="csrfInput" type="hidden" :name="csrfInput.name" :value="csrfInput.value" />
       <input v-if="SPOOFED.includes(method)" type="hidden" name="_method" :value="method" />
     </template>
-    <fieldset :disabled="disabled" :class="cx('m-0 min-w-0 border-0 p-0', theme.form)">
-      <p v-if="formError" :class="theme.formError" role="alert">{{ formError }}</p>
-      <slot name="before" v-bind="slotProps" />
-      <!-- Your own layout (default slot) with <FormoRender path="…" />, or the automatic one -->
-      <Body />
-      <slot name="actions" v-bind="slotProps" />
+    <!-- Only disables every control (`disabled`); the `form` view lays the form out -->
+    <fieldset :disabled="disabled" style="margin: 0; padding: 0; border: 0; min-width: 0">
+      <component :is="FormView" v-if="FormView" :formo="formState">
+        <template #before><slot name="before" v-bind="slotProps" /></template>
+        <!-- Your own layout (default slot) with <FormoField :field="…" />, or the automatic one -->
+        <Body />
+        <template #actions><slot name="actions" v-bind="slotProps" /></template>
+      </component>
+      <template v-else>
+        <slot name="before" v-bind="slotProps" />
+        <Body />
+        <slot name="actions" v-bind="slotProps" />
+      </template>
     </fieldset>
   </form>
 </template>

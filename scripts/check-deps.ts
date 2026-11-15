@@ -1,7 +1,7 @@
 /**
  * Fails if any package referenced by the project isn't declared in package.json.
  *
- *  - every import in src/, playground/, tests/ and the root config files
+ *  - every import in src/, playground/, tests/, registry/ and the root config files
  *    (static, dynamic, `import type`, re-exports)
  *  - CSS `@import` / `@plugin` / `@reference` of packages
  *  - tsconfig `compilerOptions.types`
@@ -21,8 +21,11 @@ const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const runtime = new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.peerDependencies ?? {})])
 const optionalDeps = new Set(Object.keys(pkg.optionalDependencies ?? {}))
 const declared = new Set([...runtime, ...Object.keys(pkg.devDependencies ?? {}), ...optionalDeps])
-/** Path aliases resolved by our own config (vite.config.ts / tsconfig paths) */
-const aliases = new Set(['formo-vue'])
+/**
+ * Path aliases resolved by our own config (aliases.config.ts / tsconfig paths):
+ * the library, and the Nuxt UI (`#components`) / shadcn-vue (`@/components/ui/*`) stubs
+ */
+const aliases = new Set(['formo-vue', '#components', '@/components'])
 const builtins = new Set(builtinModules)
 
 const problems: string[] = []
@@ -68,6 +71,7 @@ const files = [
   ...walk(join(root, 'playground')),
   ...walk(join(root, 'tests')),
   ...walk(join(root, 'scripts')),
+  ...walk(join(root, 'registry')),
   ...readdirSync(root).filter((f) => /\.config\.(ts|js|mjs)$/.test(f)).map((f) => join(root, f)),
 ]
 

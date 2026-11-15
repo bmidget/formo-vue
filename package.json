@@ -12,11 +12,16 @@
       "types": "./dist/types/index.d.ts",
       "import": "./dist/formo-vue.js"
     },
+    "./nuxt-ui": {
+      "types": "./dist/types/nuxt-ui/index.d.ts",
+      "import": "./dist/nuxt-ui.js"
+    },
     "./src/*": "./src/*"
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "registry"
   ],
   "sideEffects": false,
   "scripts": {
@@ -32,9 +37,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:deps": "bun scripts/check-deps.ts",
-    "check": "bun run check:native && bun run check:platforms && bun run check:deps && bun run typecheck && bun run test",
+    "check": "bun run check:native && bun run check:platforms && bun run check:deps && bun run check:registry && bun run typecheck && bun run test",
     "check:native": "bun scripts/check-native.ts",
-    "check:platforms": "bun scripts/check-platforms.ts"
+    "check:platforms": "bun scripts/check-platforms.ts",
+    "build:registry": "bun scripts/build-registry.ts",
+    "check:registry": "bun scripts/build-registry.ts --check"
   },
   "peerDependencies": {
     "vee-validate": "^4.15.0",

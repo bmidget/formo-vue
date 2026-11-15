@@ -1,17 +1,15 @@
-import { computed, defineComponent, h, type Component, type PropType } from 'vue'
+import { computed, defineComponent, h, type PropType } from 'vue'
 import type { FieldNode } from '../types'
 import { injectController, injectFormoOptions } from '../composables/context'
 import { getPath } from '../core/utils'
-import FormoField, { resolveComponentRef } from './FormoField'
-import FormoGroup from './FormoGroup.vue'
-import FormoBlueprint from './FormoBlueprint.vue'
+import FormoFieldEngine from './FormoFieldEngine'
+import FormoGroupEngine from './FormoGroupEngine'
+import FormoBlueprintEngine from './FormoBlueprintEngine'
 
 /**
- * Renders any node: groups → <FormoGroup>, repeatable groups → <FormoBlueprint>,
- * everything else → <FormoField>. Handles `render` (static or a function of the values).
- *
- * Groups can be overridden with `component` on the group, or globally with the
- * `group` / `blueprint` keys of `components`. They receive the same props.
+ * Renders any node (internal): subforms → the group engine, repeatable groups →
+ * the blueprint engine, everything else → the field engine. Handles `render`
+ * (static or a function of the values). Each engine renders the node's view.
  */
 export default defineComponent({
   name: 'FormoNode',
@@ -55,18 +53,12 @@ export default defineComponent({
       }
 
       if (driver?.parent || node.fields.length) {
-        const custom = node.component ? resolveComponentRef(node.component, opts) : undefined
-        const comp: Component =
-          custom ??
-          (node.blueprint
-            ? resolveComponentRef(opts.components.blueprint, opts) ?? FormoBlueprint
-            : resolveComponentRef(opts.components.group, opts) ?? FormoGroup)
-        // Slots = a custom layout for the subform (from <FormoRender>)
-        return h(comp as any, childProps, slots)
+        // Slots: your markup for the subform / repeatable group, its fields (#fields) or rows (#row)
+        return h(node.blueprint ? FormoBlueprintEngine : FormoGroupEngine, childProps, slots)
       }
 
       // Re-mount when the driver changes (different control, different field setup)
-      return h(FormoField, { ...childProps, part: props.part, key: node.driver }, slots)
+      return h(FormoFieldEngine, { ...childProps, part: props.part, key: node.driver }, slots)
     }
   },
 })

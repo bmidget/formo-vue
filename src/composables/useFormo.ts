@@ -18,7 +18,9 @@ import { FormContextKey, useForm } from 'vee-validate'
 import type {
   FormoController,
   FormoDefinition,
+  FormoArrayBinding,
   FormoErrorsInput,
+  FormoFieldsOfDefinition,
   FormoOptions,
   FormoPart,
   FormoRequestOptions,
@@ -36,6 +38,7 @@ import { sendRequest } from '../http/request'
 import { activeLocale, getTranslator } from '../i18n/translator'
 import { applyLayer, baseOptions, FormoGlobalKey } from './context'
 import FormoRender from '../components/FormoRender'
+import { createHandles } from './handles'
 
 export interface UseFormoOptions extends FormoOptions {
   /** Values merged over the definition's `val`s */
@@ -83,7 +86,10 @@ function isUnder(path: string, parent: string) {
  * Must be called inside `setup()`. `<FormoForm>` calls it for you when you pass
  * it a plain definition.
  */
-export function useFormo(definition: MaybeRefOrGetter<FormoDefinition>, options: UseFormoOptions = {}): FormoController {
+export function useFormo<D extends FormoDefinition>(
+  definition: MaybeRefOrGetter<D>,
+  options: UseFormoOptions = {},
+): FormoController<FormoFieldsOfDefinition<D>> {
   const global = inject(FormoGlobalKey, null)
 
   const baseResolved = computed<FormoResolvedOptions>(() => applyLayer(baseOptions(global), options))
@@ -99,6 +105,8 @@ export function useFormo(definition: MaybeRefOrGetter<FormoDefinition>, options:
   const resolved: ComputedRef<FormoResolvedOptions> = computed(() =>
     applyLayer(baseResolved.value, { components: root.value.components, config: root.value.config, theme: root.value.theme }),
   )
+
+  const handles = createHandles(() => controller)
 
   const initialValues = computed(() =>
     deepMerge(
@@ -131,6 +139,8 @@ export function useFormo(definition: MaybeRefOrGetter<FormoDefinition>, options:
   const claimed = shallowReactive(new Set<string>())
   const renderCache = new Map<string, Component>()
   const registrations = new Map<string, RegisteredNode[]>()
+  /** Mounted repeatable groups (their field arrays): handles add / remove rows through them, and read their keys */
+  const arrays = shallowReactive(new Map<string, FormoArrayBinding>())
   const submitHandlers: Array<(values: Record<string, any>, ctx: FormoSubmitContext) => unknown> = []
   const invalidHandlers: Array<(errors: Record<string, string>) => unknown> = []
   let callbackFailed = false
@@ -346,6 +356,12 @@ export function useFormo(definition: MaybeRefOrGetter<FormoDefinition>, options:
     get root() {
       return root.value
     },
+    get fields() {
+      return handles.root
+    },
+    field(pathOrAlias: string) {
+      return handles.find(pathOrAlias)
+    },
     vee: markRaw(vee),
     get values() {
       return vee.values
@@ -514,6 +530,15 @@ export function useFormo(definition: MaybeRefOrGetter<FormoDefinition>, options:
 
     _claimed: claimed,
 
+    _arrays: arrays,
+
+    _registerArray(path: string, binding: FormoArrayBinding) {
+      arrays.set(path, binding)
+      return () => {
+        if (arrays.get(path) === binding) arrays.delete(path)
+      }
+    },
+
     _claim(path: string) {
       claimed.add(path)
       return () => claimed.delete(path)
@@ -558,5 +583,5 @@ export function useFormo(definition: MaybeRefOrGetter<FormoDefinition>, options:
     },
   }) as FormoController
 
-  return controller
+  return controller as FormoController<FormoFieldsOfDefinition<D>>
 }

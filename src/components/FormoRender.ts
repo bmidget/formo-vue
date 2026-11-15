@@ -19,10 +19,17 @@ import {
   FormoSlotsKey,
 } from '../composables/context'
 import { locate } from '../core/locate'
-import { cx } from '../core/theme'
 import FormoNode from './FormoNode'
 import FormoChildren from './FormoChildren.vue'
-import FormoChecklist from './FormoChecklist.vue'
+
+const formKeys = new WeakMap<object, number>()
+let nextFormKey = 0
+/** A stable key per form (to key components by form) */
+export function formKey(form: object): number {
+  let key = formKeys.get(form)
+  if (key === undefined) formKeys.set(form, (key = nextFormKey++))
+  return key
+}
 
 /** `street` inside the `address` scope → `address.street`; `[0].number` → `phones[0].number` */
 function scoped(scope: string, path: string) {
@@ -37,7 +44,7 @@ function scoped(scope: string, path: string) {
  * <FormoRender path="address" />                 <!-- a whole subform -->
  * <FormoRender path="email" />                   <!-- a field: label, control, help, errors -->
  * <FormoRender path="email" part="input" />      <!-- just the control ($field->input()) -->
- * <FormoRender path="email" part="label" />      <!-- / error / help / checklist -->
+ * <FormoRender path="email" part="label" />      <!-- / errors / help / checklist (the theme's views) -->
  * <FormoRender :form="form" path="email" />      <!-- anywhere, even outside <FormoForm> -->
  * ```
  *
@@ -55,6 +62,8 @@ export default defineComponent({
     part: { type: String as PropType<FormoPart>, default: 'field' },
     /** The form (from `useFormo()`). Optional inside <FormoForm> */
     form: { type: Object as PropType<FormoController>, default: undefined },
+    /** `path` is exact and absolute: no resolving relative to the subform you're in, nor by alias (handles) */
+    exact: { type: Boolean, default: false },
   },
   setup(props, { slots }) {
     const injected = inject(FormoControllerKey, null)
@@ -85,6 +94,7 @@ export default defineComponent({
     const located = computed(() => {
       const { drivers, config } = parentOptions.value
       const root = controller.root
+      if (props.exact) return locate(root, props.path, drivers, config, { byAlias: false })
       const prefix = container().prefix
       if (prefix && props.path) {
         const target = scoped(prefix, props.path)
@@ -119,14 +129,14 @@ export default defineComponent({
         warned = true
         return null
       }
-      const theme = options.value.theme
+      const opts = options.value
       const part = props.part
 
       // The whole form's fields (no <form> element — that's <FormoForm>)
       if (loc.path === '') {
-        if (part === 'error') {
+        if (part === 'errors') {
           const message = controller.error('')
-          return message ? h('p', { class: theme.formError, role: 'alert' }, message) : null
+          return message ? h('p', { class: opts.classes.formError, role: 'alert' }, message) : null
         }
         return h(FormoChildren, { fields: controller.root.fields, prefix: '', parentAlias: controller.root.alias, groupPath: '' })
       }
@@ -135,7 +145,8 @@ export default defineComponent({
         return h(
           FormoNode,
           {
-            key: loc.path,
+            // Not keyed by path: a field whose row moves (`phones[1]` → `phones[0]`) keeps its component,
+            // like the rows the theme renders (the engines follow path changes)
             node: loc.node,
             path: loc.path,
             parentPath: loc.parentPath,
@@ -147,29 +158,13 @@ export default defineComponent({
         )
       }
 
-      // Single pieces, read from the field's live state (it must be rendered somewhere)
+      // Single pieces: the field's parts (theme views) — they read its live state, so it must be rendered somewhere
       const state = controller.find(loc.path)?.state
-      switch (part) {
-        case 'label': {
-          const marker = options.value.config.requiredMarker
-          const text = state?.label ?? controller.label(loc.path)
-          if (!text) return null
-          return h('label', { for: state?.id || undefined, class: theme.label }, [
-            text,
-            state?.required && marker ? h('span', { class: theme.required, 'aria-hidden': 'true' }, marker) : null,
-          ])
-        }
-        case 'error': {
-          const message = state?.error ?? controller.error(loc.path)
-          return message ? h('p', { id: state?.errorId, class: cx(theme.error), role: 'alert' }, message) : null
-        }
-        case 'help':
-          return state?.message ? h('p', { id: state.helpId, class: theme.help }, state.message) : null
-        case 'checklist':
-          return state ? h(FormoChecklist, { formo: state }) : null
-        default:
-          return null
+      if (!state) {
+        const message = part === 'errors' ? controller.error(loc.path) : undefined
+        return message ? h('p', { class: opts.classes.groupError, role: 'alert' }, message) : null
       }
+      return h(state._parts[part])
     }
   },
 })

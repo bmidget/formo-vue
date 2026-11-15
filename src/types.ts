@@ -1,5 +1,5 @@
 import type { Component, Ref } from 'vue'
-import type { FormoFieldState } from './composables/context'
+import type { FormoFieldState, FormoGroupState } from './composables/context'
 import type { FormContext } from 'vee-validate'
 
 /* -------------------------------------------------------------------------- */
@@ -188,6 +188,43 @@ export interface FormoValueContext {
 /** Either a component or the name of a component registered in `components` */
 export type ComponentRef = Component | string
 
+/** How a control receives its value and gives it back */
+export interface ControlModel extends ModelBinding {
+  /** The field's value → what the control gets (ex: `'a,b'` → `['a', 'b']`) */
+  get?: (value: unknown, field: FormoFieldState) => unknown
+  /** What the control emits → the field's value */
+  set?: (value: unknown, field: FormoFieldState) => unknown
+}
+
+/**
+ * A control with its contract — `defineControl()`. Lets any component (Nuxt UI,
+ * shadcn-vue, your own) be a field's control without a wrapper component:
+ *
+ * ```ts
+ * defineControl({
+ *   component: UInput,
+ *   props: (field) => ({ type: field.node.type, color: field.invalid ? 'error' : undefined }),
+ *   native: true,
+ * })
+ * ```
+ */
+export interface FormoControl {
+  readonly component: ComponentRef
+  /** Props computed from the field's state (options → `items`, invalid → `color`…). The field's own `props` win */
+  readonly props?: (field: FormoFieldState) => Record<string, unknown>
+  readonly model?: ControlModel
+  /**
+   * The component renders its own named form input(s) (a real `<input name>`, a
+   * hidden `<select>`…): native submits don't need Formo's hidden mirror inputs
+   */
+  readonly native?: boolean
+  /** @internal */
+  readonly __formoControl: true
+}
+
+/** What a field's control can be: a component, a registered name, or a `defineControl()` */
+export type ControlRef = ComponentRef | FormoControl
+
 export interface ModelBinding {
   /** Prop used to pass the value. Default: `modelValue` */
   prop?: string
@@ -201,7 +238,7 @@ export interface ModelBinding {
  * Mirrors Formo's field parameters (`alias`, `driver`, `val`, `opts`, `attr`,
  * `rules`, `label`, `render`, `editable`, `message`, `callbacks`, `filters`,
  * `fields`, `blueprint` ...) and adds Vue-specific ones (`component`, `props`,
- * `model`, `wrapper`, `classes`, `components`, `theme`).
+ * `model`, `view`, `classes`, `components`, `theme`).
  */
 export interface FieldDef {
   alias?: string | number
@@ -261,25 +298,37 @@ export interface FieldDef {
   /* ---- Vue specific ---------------------------------------------------- */
 
   /** Override the control component for this field only */
-  component?: ComponentRef
+  component?: ControlRef
   /** Extra props for the control component */
   props?: Record<string, unknown>
   /** How the control component receives/emits its value */
   model?: ModelBinding
-  /** Override (or disable with `false`) the wrapper that renders label/help/error */
-  wrapper?: ComponentRef | false
-  /** Tailwind classes for this node only, merged over the theme */
-  classes?: Partial<FormoTheme>
+  /**
+   * The view that lays this node out — Formo's `template`. A view name from the
+   * theme (`'field'`, `'inline'`, `'fieldset'`, `'bare'`, `'group'`, or one the
+   * theme adds, like `'floating'`), a component, or `false` for the bare control.
+   * `template` (from PHP `to_array()`) is read as the view name.
+   */
+  view?: ComponentRef | false
+  /** Classes for this node only, merged over the theme's */
+  classes?: Partial<FormoClasses>
 
   /* ---- Groups / forms -------------------------------------------------- */
 
-  fields?: FieldInput[]
+  /**
+   * Children. Either an object keyed by alias — `{ email: { required: true }, bio: 'textarea',
+   * address: { fields: { street: {} } } }` — or a list (`[{ alias: 'email' }, 'bio']`, PHP `to_array()`)
+   */
+  fields?: FieldInput[] | FieldsInput
   /** Component overrides that cascade to every field inside this group */
-  components?: Record<string, ComponentRef>
+  components?: Record<string, ControlRef>
   /** Config that cascades to every field inside this group (Formo "cascading config") */
   config?: Partial<FormoConfig>
-  /** Theme that cascades to every field inside this group */
-  theme?: Partial<FormoTheme>
+  /**
+   * Cascades to everything inside: a whole theme (`defineTheme()`), or overrides —
+   * `{ views?, components?, classes? }`
+   */
+  theme?: FormoTheme | FormoThemeLayer
   /** Repeatable group: `fields` is the template for each row, the value is an array */
   blueprint?: boolean
   /** Blueprint: minimum/maximum number of rows */
@@ -293,12 +342,29 @@ export interface FieldDef {
   [key: string]: unknown
 }
 
+/** A definition as the builder outputs it (`toSchema()` / `toArray()`): children are always a list */
+export interface FieldSchema extends FieldDef {
+  fields?: FieldSchema[]
+}
+
 /** Compact constructs accepted wherever a field is expected */
 export type FieldInput =
   | FieldDef
   | string
   | [alias: string | number, driver?: string, val?: unknown, opts?: FieldDef]
   | { toSchema(): FieldDef }
+
+/**
+ * One entry of a keyed `fields` object (the key is the alias):
+ *  - a definition (`{ driver: 'email', required: true }`, `{ fields: {...} }` for a subform)
+ *  - a driver name (`'textarea'`, like `.add('bio', 'textarea')`)
+ *  - a `Formo` builder
+ *  - `false` / `null` / `undefined` — skipped (`admin: isAdmin && { driver: 'checkbox' }`)
+ */
+export type FieldEntry = FieldDef | string | { toSchema(): FieldDef } | false | null | undefined
+
+/** `fields` as an object keyed by alias */
+export type FieldsInput = Record<string, FieldEntry>
 
 /** A normalized node. Produced by `normalize()` and consumed by the components. */
 export interface FieldNode {
@@ -328,15 +394,15 @@ export interface FieldNode {
   excludes: string[]
   callbacks: Required<FormoCallbacks>
   filters: FilterInput[]
-  component?: ComponentRef
+  component?: ControlRef
   props?: Record<string, unknown>
   model?: ModelBinding
-  wrapper?: ComponentRef | false
-  classes?: Partial<FormoTheme>
+  view?: ComponentRef | false
+  classes?: Partial<FormoClasses>
   fields: FieldNode[]
-  components?: Record<string, ComponentRef>
+  components?: Record<string, ControlRef>
   config?: Partial<FormoConfig>
-  theme?: Partial<FormoTheme>
+  theme?: FormoTheme | FormoThemeLayer
   blueprint: boolean
   min?: number
   max?: number
@@ -350,7 +416,15 @@ export interface FieldNode {
 /*  Drivers                                                                    */
 /* -------------------------------------------------------------------------- */
 
-export type WrapperLayout = 'stacked' | 'inline' | 'bare'
+/**
+ * Built-in field view names (Formo's `field_template` / `checkbox_template`…):
+ *  - `field`     label above the control (default)
+ *  - `inline`    control, then its label (single checkbox)
+ *  - `fieldset`  a legend over a group of controls (radios, checkboxes)
+ *  - `bare`      no label (buttons)
+ * Themes can add more (`'floating'`…) and fields pick one with `view`.
+ */
+export type FieldViewName = 'field' | 'inline' | 'fieldset' | 'bare' | (string & {})
 
 /**
  * A driver describes how a kind of field behaves — the same job Formo's
@@ -359,16 +433,20 @@ export type WrapperLayout = 'stacked' | 'inline' | 'bare'
  */
 export interface FormoDriver {
   /** The control component (leaf drivers only) */
-  component?: ComponentRef
+  component?: ControlRef
+  /**
+   * Turns what the control emits into the field's value, whatever the control
+   * (the `input` driver: numbers for `number` / `range`)
+   */
+  parse?: (value: unknown, node: FieldNode) => unknown
   /** Groups / forms contain other fields (Formo `is_a_parent`) */
   parent?: boolean
-  /** `stacked` (label above), `inline` (checkbox + label), `bare` (no wrapper chrome) */
-  layout?: WrapperLayout | ((node: FieldNode) => WrapperLayout)
   /**
-   * `label`: a `<label for>` (default), `title`: a legend for option groups
-   * (radios/checkboxes), `false`: no label at all (buttons, hidden inputs)
+   * The view its fields use by default: `field` (label above, default), `inline`
+   * (checkbox + label), `fieldset` (legend over a group of controls), `bare` (no label),
+   * any view name the theme provides, or `false` (the control alone, ex: hidden inputs)
    */
-  labelAs?: 'label' | 'title' | false | ((node: FieldNode) => 'label' | 'title' | false)
+  view?: FieldViewName | false | ((node: FieldNode) => FieldViewName | false)
   /** Value used when the definition has no `val` */
   defaultValue?: (node: FieldNode) => unknown
   /** Rules automatically added before validation (Formo `pre_validate`) */
@@ -467,7 +545,8 @@ export interface FormoConfig {
   native: boolean
 }
 
-export interface FormoTheme {
+/** The class of every element the built-in views and controls render */
+export interface FormoClasses {
   form: string
   formError: string
   group: string
@@ -477,6 +556,8 @@ export interface FormoTheme {
   field: string
   fieldInline: string
   fieldBare: string
+  /** Resets the `<fieldset>` of option groups (radios / checkboxes) */
+  fieldset: string
   label: string
   labelInline: string
   required: string
@@ -515,24 +596,106 @@ export interface FormoTheme {
   checklistFailed: string
 }
 
+/**
+ * The views of a theme — the Vue counterparts of Formo's PHP view files. Every
+ * view gets a `formo` prop (the state of what it renders) and fills its slots:
+ *
+ *  - `form`          inside `<form>` (≈ form_template.php) — slots `before`, `default`, `actions`
+ *  - `group`         a subform (≈ group_template.php) — slot `default` (the fields)
+ *  - `blueprint`     repeatable rows — slot `row` (`{ row }`), once per row
+ *  - `blueprintRow`  one row (gets `row` too) — slot `default` (the row's fields)
+ *  - `field`, `inline`, `fieldset`, `bare` (≈ field_template.php / checkbox_template.php) —
+ *                    slots `label`, `input`, `help`, `errors`, `checklist`
+ *  - `label`, `help`, `errors`, `checklist`, `uneditable` — the pieces of a field
+ *  - `errorSummary`  `<FormoErrorSummary>`
+ *
+ * Any other key is a named view fields can pick with `view: 'floating'`.
+ */
+export interface FormoViews {
+  form: ComponentRef
+  group: ComponentRef
+  blueprint: ComponentRef
+  blueprintRow: ComponentRef
+  field: ComponentRef
+  inline: ComponentRef
+  fieldset: ComponentRef
+  bare: ComponentRef
+  label: ComponentRef
+  help: ComponentRef
+  errors: ComponentRef
+  checklist: ComponentRef
+  uneditable: ComponentRef
+  errorSummary: ComponentRef
+  [name: string]: ComponentRef
+}
+
+/** Overrides layered over a theme (app-wide, per form, per group) */
+export interface FormoThemeLayer {
+  views?: Partial<FormoViews>
+  /** Controls, keyed by driver (`select`), driver + type (`input|date`) or a name (`component: 'stars'`) */
+  components?: Record<string, ControlRef>
+  classes?: Partial<FormoClasses>
+}
+
+/** What `defineTheme()` accepts */
+export interface FormoThemeInput extends FormoThemeLayer {
+  name?: string
+  /** Start from another theme: its views/components are kept, its classes merged with yours */
+  extends?: FormoTheme
+  /** How class overrides combine with the theme's (default: the parent's, else concatenation) */
+  mergeClasses?: (...classes: Array<string | undefined>) => string
+}
+
+/**
+ * A complete theme — Formo's template directory: the views, the controls and the
+ * classes they use. Made with `defineTheme()`; the built-in one is `defaultTheme` (Tailwind).
+ */
+export interface FormoTheme {
+  readonly name: string
+  /** Views this theme provides (the rest fall back to the built-in views) */
+  readonly views: Partial<FormoViews>
+  readonly components: Record<string, ControlRef>
+  /** Every class key (the ones not given are empty) */
+  readonly classes: FormoClasses
+  readonly mergeClasses: (...classes: Array<string | undefined>) => string
+  /** @internal */
+  readonly __formoTheme: true
+}
+
 export interface FormoOptions {
-  /** Component overrides, keyed by driver (`select`), driver + type (`input|date`) or any name referenced by `component: 'name'` */
-  components?: Record<string, ComponentRef>
+  /**
+   * The theme — a complete set of views, controls and classes (`defineTheme()`),
+   * or overrides over the current one (`{ views, components, classes }`)
+   */
+  theme?: FormoTheme | FormoThemeLayer
+  /** View overrides: `{ field: MyFieldView, errors: MyErrors, floating: FloatingLabel }` */
+  views?: Partial<FormoViews>
+  /** Control overrides, keyed by driver (`select`), driver + type (`input|date`) or any name referenced by `component: 'name'` */
+  components?: Record<string, ControlRef>
+  /** Class overrides, merged over the theme's */
+  classes?: Partial<FormoClasses>
   /** Extra/overridden drivers */
   drivers?: Record<string, FormoDriver>
   /** Extra/overridden rules */
   rules?: Record<string, RuleFn>
   config?: Partial<FormoConfig>
-  theme?: Partial<FormoTheme>
 }
 
 /** The cascading context every component sees (plugin → form → group → ...) */
 export interface FormoResolvedOptions {
-  components: Record<string, ComponentRef>
+  /** The base theme */
+  theme: FormoTheme
+  /** View overrides (over the theme's) */
+  views: Record<string, ComponentRef>
+  /** Control / named component overrides (over the theme's) */
+  components: Record<string, ControlRef>
+  /** Class override layers, in order (re-applied when a scope switches theme) */
+  classLayers: Array<Partial<FormoClasses>>
+  /** The resolved classes: the theme's + every override */
+  classes: FormoClasses
   drivers: Record<string, FormoDriver>
   rules: Record<string, RuleFn>
   config: FormoConfig
-  theme: FormoTheme
 }
 
 /* -------------------------------------------------------------------------- */
@@ -543,9 +706,9 @@ export interface FormoResolvedOptions {
  * Which part of a field/subform to render — Formo's `render()` / `input()` / `label()` / `error()`:
  *  - `field`     label, control, help, errors (a subform: the whole fieldset)
  *  - `input`     the control only
- *  - `label`, `error`, `help`, `checklist`  just that piece
+ *  - `label`, `errors`, `help`, `checklist`  just that piece
  */
-export type FormoPart = 'field' | 'input' | 'label' | 'error' | 'help' | 'checklist'
+export type FormoPart = 'field' | 'input' | 'label' | 'errors' | 'help' | 'checklist'
 
 /**
  * A condition on the form values, used by `ignore` / `exclude`:
@@ -568,6 +731,116 @@ export type Condition =
 /** Something that can define a form: a builder, a plain definition or Formo PHP `to_array()` JSON */
 export type FormoDefinition = FieldInput
 
+/* -------------------------------------------------------------------------- */
+/*  Handles: form.fields.email                                                 */
+/* -------------------------------------------------------------------------- */
+
+export type FormoHandleKind = 'field' | 'group' | 'blueprint'
+
+/**
+ * A reference to a field, subform or repeatable group of a form — what
+ * `<FormoField :field="form.fields.email">` renders. Stable (one object per
+ * path), and its getters read the form's live state.
+ */
+export interface FormoHandle {
+  /** `field`, `group` (a subform) or `blueprint` (repeatable rows) */
+  readonly kind: FormoHandleKind
+  /** Path in the form values (`address.street`, `phones[0].number`) */
+  readonly path: string
+  readonly alias: string | number
+  /** Its current normalized definition */
+  readonly node: FieldNode | undefined
+  readonly form: FormoController<any>
+  /** Its value (get / set) */
+  value: any
+  readonly error: string | undefined
+  /** Currently ignored (fully optional)? */
+  readonly ignored: boolean
+  /** Subforms: their children, by alias */
+  readonly fields?: FormoFields
+  /** Repeatable groups: one handle per row */
+  readonly rows?: Array<FormoRowHandle<any>>
+}
+
+/** Children of a form / subform / row, by alias */
+export type FormoFields = { readonly [alias: string]: FormoHandle | undefined }
+
+export interface FormoFieldHandle extends FormoHandle {
+  readonly kind: 'field'
+}
+
+export interface FormoGroupHandle<F = FormoFields> extends FormoHandle {
+  readonly kind: 'group'
+  readonly fields: F & FormoFields
+}
+
+export interface FormoBlueprintHandle<F = FormoFields> extends FormoHandle {
+  readonly kind: 'blueprint'
+  /** One handle per row — `v-for="row in phones.rows" :key="row.key"` */
+  readonly rows: Array<FormoRowHandle<F>>
+  /** Add a row (the row's defaults, merged with `values`) — unless `max` is reached */
+  add(values?: Record<string, unknown>): void
+  /** Remove a row — unless `min` is reached */
+  remove(index: number): void
+  /** Below `max`? */
+  readonly canAdd: boolean
+  /** Above `min`? */
+  readonly canRemove: boolean
+}
+
+/** One row of a repeatable group: `form.fields.phones.rows[0].fields.number` */
+export interface FormoRowHandle<F = FormoFields> {
+  /** Stable across adds / removes — use it as the `v-for` key */
+  readonly key: string | number
+  readonly index: number
+  /** `phones[0]` */
+  readonly path: string
+  readonly fields: F & FormoFields
+  readonly form: FormoController<any>
+  /** Remove this row (unless `min` is reached) */
+  remove(): void
+}
+
+type Falsy = false | null | undefined
+
+/** The handle type of one entry of a keyed `fields` object */
+export type FormoHandleOf<E> = E extends Falsy
+  ? undefined
+  : E extends string
+    ? FormoFieldHandle
+    : E extends { readonly __formoDef?: infer D }
+      ? FormoHandleOf<D>
+      : E extends { blueprint: infer B; fields: infer C }
+        ? true extends B
+          ? FormoBlueprintHandle<FormoFieldsOf<C>>
+          : FormoGroupHandle<FormoFieldsOf<C>>
+        : E extends { fields: infer C }
+          ? FormoGroupHandle<FormoFieldsOf<C>>
+          : E extends { driver: 'group' | 'form' }
+            ? FormoGroupHandle
+            : FormoFieldHandle
+
+/** Handles for a `fields` input: typed for keyed objects, loose for lists */
+export type FormoFieldsOf<C> = C extends readonly unknown[]
+  ? FormoFields
+  : C extends Record<string, unknown>
+    ? { readonly [K in keyof C]: FormoHandleOf<C[K]> }
+    : FormoFields
+
+/** Handles of a whole definition (a builder or a plain object) */
+export type FormoFieldsOfDefinition<D> = D extends { readonly __formoDef?: infer X }
+  ? FormoFieldsOfDefinition<X>
+  : D extends { fields: infer C }
+    ? FormoFieldsOf<C>
+    : FormoFields
+
+/** @internal A mounted repeatable group's rows (vee-validate field array) */
+export interface FormoArrayBinding {
+  keys: () => Array<string | number>
+  push: (row: Record<string, unknown>) => void
+  remove: (index: number) => void
+}
+
 export interface RegisteredNode {
   node: FieldNode
   path: string
@@ -579,8 +852,10 @@ export interface RegisteredNode {
   valuePath?: string
   /** Registry path of the group/form containing this node (`undefined` for the form itself) */
   groupPath?: string
-  /** Fields: their live state (label, id, error…) — lets <FormoRender part="label|error|help"> render pieces elsewhere */
+  /** Fields: their live state (label, id, error…) — lets <FormoLabel :field="handle"> & co. render pieces elsewhere */
   state?: FormoFieldState
+  /** Groups: their live state */
+  groupState?: FormoGroupState
   validate?: () => Promise<{ valid: boolean; errors: string[] }>
 }
 
@@ -603,10 +878,18 @@ export interface FormoSubmitContext {
   request: (url?: string, options?: FormoRequestOptions) => Promise<FormoResponse>
 }
 
-export interface FormoController {
+export interface FormoController<F = FormoFields> {
   readonly alias: string | number
   /** The normalized root node */
   readonly root: FieldNode
+  /**
+   * Handles for the form's fields — `<FormoField :field="form.fields.email" />`.
+   * Subforms nest under `fields` too: `form.fields.address.fields.zip`;
+   * repeatable groups have `rows`: `form.fields.phones.rows[0].fields.number`.
+   */
+  readonly fields: F & FormoFields
+  /** A handle by path (`address.zip`, `phones[0].number`) or alias — fields added at runtime, JSON schemas */
+  field(pathOrAlias: string): FormoHandle | undefined
   /** The underlying vee-validate form */
   readonly vee: FormContext<any>
   /** Raw form values (reactive) */
@@ -677,6 +960,10 @@ export interface FormoController {
   _claim(path: string): () => void
   /** @internal */
   _register(entry: RegisteredNode): () => void
+  /** @internal Mounted repeatable groups, by path: their row keys and actions (handles use them) */
+  readonly _arrays: Map<string, FormoArrayBinding>
+  /** @internal */
+  _registerArray(path: string, binding: FormoArrayBinding): () => void
   /** @internal The controller's own options (without the rendering form's layer) */
   readonly _baseOptions: FormoResolvedOptions
   /** @internal The rendering <FormoForm> shares its layered options */
@@ -699,7 +986,7 @@ export interface FormoUiStrings {
   remove: string
   /** Blueprint row heading — `:label`, `:index` */
   rowLabel: string
-  /** <FormoErrors> title */
+  /** <FormoErrorSummary> title */
   errorSummary: string
   yes: string
   no: string

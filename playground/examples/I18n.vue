@@ -12,7 +12,7 @@
  */
 import { computed, ref } from 'vue'
 import ja from '@vee-validate/i18n/dist/locale/ja.json'
-import { Formo, FormoErrors, FormoForm, fromVeeValidateLocale, useFormo, type FormoLocaleMessages } from 'formo-vue'
+import { Formo, FormoErrorSummary, FormoForm, fromVeeValidateLocale, useFormo, type FormoLocaleMessages } from 'formo-vue'
 
 const locale = ref('en')
 const languages = [
@@ -115,7 +115,7 @@ const submitted = ref<Record<string, unknown>>()
 
       <FormoForm :form="form" :config="config" @submit="(values) => (submitted = values)">
         <template #before>
-          <FormoErrors />
+          <FormoErrorSummary />
         </template>
       </FormoForm>
     </div>

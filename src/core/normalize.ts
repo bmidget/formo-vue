@@ -2,13 +2,17 @@ import { markRaw, toRaw } from 'vue'
 import type {
   CallbacksInput,
   FieldDef,
+  FieldEntry,
   FieldInput,
+  FieldsInput,
   FormoCallback,
   FormoCallbacks,
   FormoDriver,
   FieldNode,
+  FormoThemeLayer,
   RulesInput,
 } from '../types'
+import { isTheme } from './theme'
 import { parseRules, hasRule } from './rules'
 import { NOTSET, cleanAlias, isPlainObject, setPath, toArray } from './utils'
 
@@ -22,7 +26,7 @@ const INPUT_TYPES = new Set([
 const KNOWN_KEYS = new Set([
   'alias', 'driver', 'val', 'value', 'label', 'message', 'opts', 'options', 'blank', 'attr', 'rules',
   'required', 'errorMessages', 'error_messages', 'render', 'editable', 'ignore', 'callbacks', 'filters',
-  'order', 'component', 'props', 'model', 'wrapper', 'classes', 'fields', 'components', 'config', 'theme',
+  'order', 'component', 'props', 'model', 'view', 'template', 'classes', 'fields', 'components', 'config', 'theme',
   'blueprint', 'min', 'max', 'addLabel', 'removeLabel', 'type', 'parent', 'errorDisplay', 'checklist', 'requirements', 'exclude', 'ignores', 'excludes',
 ])
 
@@ -45,6 +49,17 @@ function rawComponentMap<T extends Record<string, unknown> | undefined>(map: T):
   return out as T
 }
 
+/** A theme on a node: themes are raw already; a layer's views/components must not become reactive */
+function rawTheme(theme: FieldNode['theme']): FieldNode['theme'] {
+  if (!theme || isTheme(theme)) return theme
+  const layer = toRaw(theme) as FormoThemeLayer
+  return {
+    ...layer,
+    views: layer.views ? rawComponentMap(layer.views as Record<string, unknown>) as FormoThemeLayer['views'] : undefined,
+    components: rawComponentMap(layer.components),
+  }
+}
+
 function hasToSchema(value: unknown): value is { toSchema(): FieldDef } {
   return !!value && typeof (value as any).toSchema === 'function'
 }
@@ -57,6 +72,57 @@ export function constructToDef(args: unknown[]): FieldDef {
   if (typeof driver === 'string') def.driver = driver
   if (args.length >= 3) def.val = val
   return def
+}
+
+const INTEGER_KEY = /^(0|[1-9]\d*)$/
+/** Definitions already warned about (normalize runs again on every change) */
+const warned = new WeakSet<object>()
+
+/**
+ * A keyed `fields` object → the list form (the key is the alias):
+ *
+ *   { email: { required: true }, bio: 'textarea', address: { fields: { street: {} } }, admin: false }
+ *   → [{ alias: 'email', required: true }, { alias: 'bio', driver: 'textarea' }, { alias: 'address', fields: … }]
+ *
+ * `false` / `null` / `undefined` entries are skipped. Builders are kept as they are
+ * (their alias is set to the key), so they stay live. Lists pass through unchanged.
+ */
+export function fieldsToList<T = FieldInput>(
+  fields: FieldInput[] | FieldsInput | undefined | null,
+  withBuilder: (builder: { toSchema(): FieldDef }, alias: string) => T = (builder, alias) =>
+    ({ ...builder.toSchema(), alias }) as T,
+): Array<FieldInput | T> {
+  if (!fields) return []
+  if (Array.isArray(fields)) return fields
+  if (!isPlainObject(fields)) return []
+  const keys = Object.keys(fields)
+  const dev = import.meta.env?.DEV && !warned.has(toRaw(fields))
+  if (dev) warned.add(toRaw(fields))
+  if (dev && keys.some((k) => INTEGER_KEY.test(k)) && keys.some((k) => !INTEGER_KEY.test(k))) {
+    console.warn(
+      `[formo] fields: integer-like keys (${keys.filter((k) => INTEGER_KEY.test(k)).join(', ')}) always come first in a ` +
+        'JavaScript object, whatever order you wrote them in. Use the list form (fields: [...]) or `order` for numeric aliases.',
+    )
+  }
+  const out: Array<FieldInput | T> = []
+  for (const key of keys) {
+    const entry = (fields as Record<string, FieldEntry>)[key]
+    if (entry === false || entry === null || entry === undefined) continue
+    if (typeof entry === 'string') {
+      out.push({ alias: key, driver: entry })
+    } else if (hasToSchema(entry)) {
+      out.push(withBuilder(entry, key))
+    } else if (isPlainObject(entry)) {
+      const def = entry as FieldDef
+      if (dev && def.alias !== undefined && String(cleanAlias(def.alias)) !== String(cleanAlias(key))) {
+        console.warn(`[formo] fields.${key} has alias "${def.alias}": the key is the alias, "${def.alias}" is ignored`)
+      }
+      out.push({ ...def, alias: key })
+    } else if (dev) {
+      console.warn(`[formo] fields.${key}: expected a definition, a driver name, a Formo builder or false`)
+    }
+  }
+  return out
 }
 
 function toFieldDef(input: FieldInput): FieldDef {
@@ -121,7 +187,8 @@ function resolveDriver(def: FieldDef, drivers: Record<string, FormoDriver>, fall
   }
   if (!driver) {
     // A field with its own component and no driver gets the neutral `custom` driver (empty value: null)
-    driver = Array.isArray(def.fields) ? 'group' : def.component && drivers.custom ? 'custom' : fallback
+    const hasFields = Array.isArray(def.fields) || isPlainObject(def.fields)
+    driver = hasFields ? 'group' : def.component && drivers.custom ? 'custom' : fallback
   }
 
   return { driver, type }
@@ -219,12 +286,13 @@ export function normalize(input: FieldInput, options: NormalizeOptions, isRoot =
     component: rawComponent(raw.component as FieldNode['component']),
     props: raw.props as FieldNode['props'],
     model: raw.model as FieldNode['model'],
-    wrapper: rawComponent(raw.wrapper as FieldNode['wrapper']),
+    // Formo `template` (PHP to_array() carries `template: null`) is the view's name
+    view: rawComponent((raw.view ?? (typeof raw.template === 'string' ? raw.template : undefined)) as FieldNode['view']),
     classes: raw.classes as FieldNode['classes'],
     fields: [],
     components: rawComponentMap(raw.components as FieldNode['components']),
     config: raw.config as FieldNode['config'],
-    theme: raw.theme as FieldNode['theme'],
+    theme: rawTheme(raw.theme as FieldNode['theme']),
     blueprint: raw.blueprint === true,
     min: raw.min as number | undefined,
     max: raw.max as number | undefined,
@@ -235,8 +303,13 @@ export function normalize(input: FieldInput, options: NormalizeOptions, isRoot =
 
   if (node.hasVal && node.val === NOTSET) node.val = undefined
 
-  if (Array.isArray(raw.fields)) {
-    const children = raw.fields.map((child) => {
+  if (import.meta.env?.DEV && 'wrapper' in raw && !warned.has(raw.wrapper as object)) {
+    if (raw.wrapper && typeof raw.wrapper === 'object') warned.add(raw.wrapper as object)
+    console.warn(`[formo] "${String(alias)}": \`wrapper\` was replaced by \`view\` (a view name, a component, or false)`)
+  }
+
+  if (raw.fields && typeof raw.fields === 'object') {
+    const children = fieldsToList(raw.fields).map((child) => {
       const def = toFieldDef(child)
       return { node: normalize(def, options, false), order: def.order }
     })

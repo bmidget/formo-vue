@@ -3,9 +3,9 @@
  * A separate component, outside the <form> element, rendering one field of
  * the same form — it's still validated and submitted with the rest.
  */
-import { FormoRender, type FormoController } from 'formo-vue'
+import { FormoField, type FormoHandle } from 'formo-vue'
 
-defineProps<{ form: FormoController }>()
+defineProps<{ field: FormoHandle }>()
 </script>
 
 <template>
@@ -13,7 +13,7 @@ defineProps<{ form: FormoController }>()
     <p class="text-sm font-semibold">Stay in the loop</p>
     <p class="mt-1 text-xs text-indigo-100">This card lives outside the &lt;form&gt; — it renders the form's <code>newsletter</code> field itself.</p>
     <div class="mt-4 rounded-xl bg-white/95 p-3 text-slate-900">
-      <FormoRender :form="form" path="newsletter" />
+      <FormoField :field="field" />
     </div>
   </div>
 </template>

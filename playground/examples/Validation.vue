@@ -12,7 +12,7 @@
  */
 import { computed, ref } from 'vue'
 import { z } from 'zod'
-import { Formo, FormoErrors, FormoForm, useFormo, type ValidationMode } from 'formo-vue'
+import { Formo, FormoErrorSummary, FormoForm, useFormo, type ValidationMode } from 'formo-vue'
 
 const form = useFormo(
   Formo.form({ alias: 'validation' })
@@ -102,7 +102,7 @@ const submitted = ref<Record<string, unknown>>()
 
       <FormoForm :form="form" :config="config" @submit="(values) => (submitted = values)">
         <template #before>
-          <FormoErrors />
+          <FormoErrorSummary />
         </template>
       </FormoForm>
     </div>

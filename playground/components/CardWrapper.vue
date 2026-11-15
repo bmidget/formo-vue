@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * A replacement for FormoFieldWrapper (label/help/error chrome).
- * Same `formo` prop, control comes through the default slot.
+ * A field view (instead of the theme's `field` view), for one field:
+ * `{ view: CardWrapper }`. It gets the field's state as `formo` and places
+ * Formo's parts — the control, the error… — through slots.
  */
 import type { FormoFieldState } from 'formo-vue'
 
@@ -15,14 +16,14 @@ defineProps<{ formo: FormoFieldState }>()
   >
     <div class="mb-3 flex items-start justify-between gap-4">
       <div>
-        <label :for="formo.id" class="text-sm font-semibold text-slate-900">{{ formo.label }}</label>
-        <p v-if="formo.message" :id="formo.helpId" class="text-xs text-slate-500">{{ formo.message }}</p>
+        <slot name="label" class="font-semibold text-slate-900" />
+        <slot name="help" />
       </div>
       <span v-if="formo.required" class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
         Required
       </span>
     </div>
-    <slot />
-    <p v-if="formo.error" :id="formo.errorId" role="alert" class="mt-2 text-xs font-medium text-rose-600">⚠ {{ formo.error }}</p>
+    <slot name="input" />
+    <slot name="errors" class="mt-2" />
   </div>
 </template>

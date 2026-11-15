@@ -25,7 +25,7 @@ interface WalkContext {
   rowsOf?: (path: string) => number[]
 }
 
-const isGroup = (node: FieldNode, drivers: Record<string, FormoDriver>) =>
+export const isGroup = (node: FieldNode, drivers: Record<string, FormoDriver>) =>
   !!drivers[node.driver]?.parent || node.fields.length > 0
 
 /**
@@ -76,6 +76,7 @@ export function locate(
   target: string,
   drivers: Record<string, FormoDriver>,
   config: FormoConfig,
+  { byAlias = true }: { byAlias?: boolean } = {},
 ): LocatedNode | undefined {
   if (target === '' || target === ':self') {
     return { node: root, path: '', parentPath: '', groupPath: '', ancestors: [], childPrefix: '' }
@@ -97,7 +98,7 @@ export function locate(
       }
     },
   })
-  if (found) return found
+  if (found || !byAlias) return found
 
   // Formo find(): by alias, shallowest first
   let best: LocatedNode | undefined

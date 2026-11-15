@@ -128,7 +128,7 @@ describe('<FormoForm>', () => {
     controller.load({ username: 'ben', password: 'wrong' })
     expect(await controller.validate()).toBe(false)
     await settle()
-    expect(wrapper.get('form > fieldset > p[role="alert"]').text()).toBe('Username or password is incorrect')
+    expect(wrapper.get('form > fieldset > div > p[role="alert"]').text()).toBe('Username or password is incorrect')
     expect(controller.errors).toEqual({ ':self': 'Username or password is incorrect' })
 
     controller.val('password', 'secret')
@@ -317,25 +317,25 @@ describe('overriding components', () => {
     expect(wrapper.get('.toggle').text()).toBe('Dark mode: on')
   })
 
-  it('with #control: and #field: slots', async () => {
+  it('with #input: and #field: slots', async () => {
     const wrapper = mount(FormoForm, {
       props: { form: { fields: ['tags', 'zip', 'untouched'] } },
       slots: {
-        'control:tags': (field: any) => h('span', { class: 'tags-slot' }, `${field.label} control`),
+        'input:tags': ({ field }: any) => h('span', { class: 'tags-slot' }, `${field.label} control`),
         'field:zip': () => h('div', { class: 'zip-slot' }, 'custom zip'),
       },
     })
     await settle()
     expect(wrapper.get('.tags-slot').text()).toBe('Tags control')
-    expect(wrapper.get('label[for="formo-tags"]').text()).toBe('Tags') // wrapper kept for control:
+    expect(wrapper.get('label[for="formo-tags"]').text()).toBe('Tags') // the view is kept for input:
     expect(wrapper.get('.zip-slot').text()).toBe('custom zip')
     expect(wrapper.find('label[for="formo-zip"]').exists()).toBe(false) // field: replaces everything
   })
 
-  it('with a custom wrapper and model binding for third-party components', async () => {
+  it('with a custom view and model binding for third-party components', async () => {
     const Wrapper = defineComponent({
       props: ['formo'],
-      setup: (props, { slots }) => () => h('section', { class: 'my-wrapper' }, [h('b', props.formo.label), slots.default?.()]),
+      setup: (props, { slots }) => () => h('section', { class: 'my-wrapper' }, [h('b', props.formo.label), slots.input?.()]),
     })
     const ThirdParty = defineComponent({
       props: { value: String },
@@ -346,7 +346,7 @@ describe('overriding components', () => {
     const wrapper = mount(FormoForm, {
       props: {
         form: { fields: [{ alias: 'color', component: ThirdParty, model: { prop: 'value', event: 'change' } }] },
-        components: { wrapper: Wrapper },
+        views: { field: Wrapper },
         'onUpdate:modelValue': (v: Record<string, any>) => (model.value = v),
       },
     })
@@ -363,7 +363,7 @@ describe('theme', () => {
     const wrapper = mount(FormoForm, {
       props: {
         form: { fields: [{ alias: 'a' }, { alias: 'b', classes: { control: 'rounded-none' }, attr: { class: 'w-1/2' } }] },
-        theme: { control: 'border-2' },
+        classes: { control: 'border-2' },
       },
     })
     await settle()

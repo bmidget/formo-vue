@@ -23,7 +23,8 @@ const isGroup = (node: FieldNode, drivers: Record<string, FormoDriver>) =>
  * of a custom layout so nothing is forgotten (unrendered fields aren't validated).
  *
  * A subform you placed only some fields of gets the rest of its fields rendered
- * individually here.
+ * individually here. A repeatable group whose rows you render yourself
+ * (`row.fields.number`) counts as placed.
  */
 export default defineComponent({
   name: 'FormoRest',
@@ -63,11 +64,15 @@ export default defineComponent({
       }
       if (!group) return []
 
+      /** Rows of a repeatable group placed by hand (`phones[0].number`): you're rendering its rows yourself */
+      const rowsClaimed = (path: string) => [...claimed].some((p) => p.startsWith(`${path}[`))
+
       const claimedUnder = (node: FieldNode, nodePrefix: string, c: FormoConfig): boolean =>
         node.fields.some((child) => {
           const path = joinPath(nodePrefix, child.alias)
           if (claimed.has(path)) return true
-          if (!isGroup(child, drivers) || child.blueprint) return false
+          if (child.blueprint) return rowsClaimed(path)
+          if (!isGroup(child, drivers)) return false
           const childCfg = child.config ? deepMerge(c, child.config) : c
           return claimedUnder(child, groupNamespaces(child, c) ? path : nodePrefix, childCfg)
         })
@@ -77,7 +82,7 @@ export default defineComponent({
         const nodeCfg = node.config ? deepMerge(c, node.config) : c
         for (const child of node.fields) {
           const path = joinPath(nodePrefix, child.alias)
-          if (claimed.has(path)) continue
+          if (claimed.has(path) || (child.blueprint && rowsClaimed(path))) continue
           if (isGroup(child, drivers) && !child.blueprint) {
             const childPrefix = groupNamespaces(child, nodeCfg) ? path : nodePrefix
             if (claimedUnder(child, childPrefix, nodeCfg)) {

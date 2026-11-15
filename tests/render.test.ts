@@ -17,7 +17,7 @@ const definition = () =>
     .add('last_name', { required: true })
     .add('email', 'input|email', { required: true, message: 'We never share it' })
     .add(
-      Formo.group('address', { theme: { control: 'address-control' } })
+      Formo.group('address', { theme: { classes: { control: 'address-control' } } })
         .add('street', { required: true })
         .add('zip', { rules: 'required|digits:5' })
         .add('city'),
@@ -92,7 +92,7 @@ describe('<FormoRender> parts', () => {
         h('div', { class: 'my-label' }, [h(FormoRender, { path: 'email', part: 'label' })]),
         h('div', { class: 'my-input' }, [h(FormoRender, { path: 'email', part: 'input' })]),
         h('div', { class: 'my-help' }, [h(FormoRender, { path: 'email', part: 'help' })]),
-        h('div', { class: 'my-error' }, [h(FormoRender, { path: 'email', part: 'error' })]),
+        h('div', { class: 'my-error' }, [h(FormoRender, { path: 'email', part: 'errors' })]),
         h(FormoRest),
       ]),
     )
@@ -111,12 +111,12 @@ describe('<FormoRender> parts', () => {
     wrapper.unmount()
   })
 
-  it('a subform with your own inner layout — paths inside are relative to it', async () => {
+  it('a subform with your own inner layout (#fields) — paths inside are relative to it', async () => {
     const { wrapper } = host((form) =>
       h(FormoForm, { form }, () => [
-        h(FormoRender, { path: 'address' }, () =>
-          h('div', { class: 'inline' }, [h(FormoRender, { path: 'zip' }), h(FormoRender, { path: 'city' }), h(FormoRest)]),
-        ),
+        h(FormoRender, { path: 'address' }, {
+          fields: () => h('div', { class: 'inline' }, [h(FormoRender, { path: 'zip' }), h(FormoRender, { path: 'city' }), h(FormoRest)]),
+        }),
         h(FormoRest),
       ]),
     )
@@ -177,7 +177,7 @@ describe('parts outside <FormoForm>', () => {
           form = useFormo(Formo.form({ alias: 'nl', rules: [(v: any) => v.email !== 'blocked@x.io' || 'Blocked address'] }).add('email', 'input|email', { required: true }).add('name'))
           return () =>
             h('div', [
-              h('main', [h(FormoRender, { form, path: 'name' }), h(FormoRender, { form, path: '', part: 'error' })]),
+              h('main', [h(FormoRender, { form, path: 'name' }), h(FormoRender, { form, path: '', part: 'errors' })]),
               h(Sidebar, { form }),
               h('button', { class: 'go', onClick: () => form.submit(save) }, 'Go'),
             ])

@@ -1,6 +1,6 @@
 import { markRaw, shallowRef, type ShallowRef } from 'vue'
-import type { CallbacksInput, FieldDef, FieldInput, FormoCallback, RuleItem, RulesInput } from '../types'
-import { constructToDef } from './normalize'
+import type { CallbacksInput, FieldDef, FieldInput, FieldSchema, FieldsInput, FormoCallback, RuleItem, RulesInput } from '../types'
+import { constructToDef, fieldsToList } from './normalize'
 import { canonicalRuleName, parseRules } from './rules'
 import { NOTSET, cleanAlias, getPath, isPlainObject, setPath, toArray } from './utils'
 
@@ -21,6 +21,22 @@ function rulesToList(input: RulesInput | undefined): RulesInput[] {
 /**
  * The form object — a JavaScript port of Formo's PHP API.
  *
+ * Define it in one go with a nested object (subforms are entries with `fields`):
+ *
+ * ```ts
+ * const form = Formo.form({
+ *   alias: 'user',
+ *   fields: {
+ *     username: { required: true },
+ *     email: { driver: 'email', required: true },
+ *     notes: 'textarea',
+ *     address: { fields: { street: {}, zip: { rules: 'required|digits:5' } } },
+ *   },
+ * })
+ * ```
+ *
+ * …or field by field, like the PHP API (both mix freely, and `.add()` keeps working after render):
+ *
  * ```ts
  * const form = Formo.form({ alias: 'user' })
  *   .add('username', { rules: [['not_empty'], ['min_length', [':value', 3]]] })
@@ -36,7 +52,10 @@ function rulesToList(input: RulesInput | undefined): RulesInput[] {
  * Mutations after rendering are reactive (fields can be added/removed live).
  * Runtime state (values, errors, validate) lives in the controller — see `useFormo()`.
  */
-export class Formo {
+export class Formo<D extends FieldDef = FieldDef> {
+  /** Type only: the definition it was created from (gives `form.fields` its types) */
+  declare readonly __formoDef?: D
+
   /** Bumped on every mutation so rendered forms update */
   readonly version: ShallowRef<number> = markRaw(shallowRef(0))
 
@@ -46,21 +65,27 @@ export class Formo {
 
   /* ---- Factories --------------------------------------------------------- */
 
-  /** A form (Formo::form). Alias defaults to `formo` */
-  static form(def: FieldDef | string = {}): Formo {
-    const d = typeof def === 'string' ? { alias: def } : def
-    return new Formo({ alias: 'formo', driver: 'form', ...d })
+  /**
+   * A form (Formo::form). Alias defaults to `formo`.
+   *   Formo.form('user') · Formo.form({ alias: 'user', fields: { email: {}, bio: 'textarea' } })
+   */
+  static form<T extends FieldDef = FieldDef>(def?: T | string): Formo<T> {
+    const d = typeof def === 'string' ? { alias: def } : (def ?? {})
+    return new Formo({ alias: 'formo', driver: 'form', ...d }) as Formo<T>
   }
 
-  /** A group / subform */
-  static group(alias?: string | FieldDef, def: FieldDef = {}): Formo {
-    const d = typeof alias === 'object' ? alias : { ...def, alias }
-    return new Formo({ driver: 'group', ...d })
+  /**
+   * A group / subform.
+   *   Formo.group('address').add('street') · Formo.group('address', { fields: { street: {} } })
+   */
+  static group<T extends FieldDef = {}>(alias?: string | T, def?: T): Formo<T & { driver: 'group' }> {
+    const d = typeof alias === 'object' ? alias : { ...(def ?? {}), alias }
+    return new Formo({ driver: 'group', ...d }) as Formo<T & { driver: 'group' }>
   }
 
   /** Any field (Formo::factory) */
-  static factory(def: FieldDef = {}): Formo {
-    return new Formo(def)
+  static factory<T extends FieldDef = FieldDef>(def: T = {} as T): Formo<T> {
+    return new Formo(def) as Formo<T>
   }
 
   /** Build from a definition or from Formo PHP `$form->to_array()` JSON */
@@ -76,9 +101,20 @@ export class Formo {
     if (d.label === NOTSET) delete d.label
     if (d.alias !== undefined) d.alias = cleanAlias(d.alias)
     this.#def = d
-    for (const field of fields ?? []) this.#append(Formo.#toFormo(field))
+    for (const field of Formo.#childList(fields)) this.#append(Formo.#toFormo(field))
     // Never let Vue proxy a builder (private fields don't work through proxies)
     markRaw(this)
+  }
+
+  /** `fields` as a list or keyed by alias — keyed builders get the key as alias (and stay live) */
+  static #childList(fields: FieldInput[] | FieldsInput | undefined): Array<FieldInput | Formo> {
+    return fieldsToList<Formo>(fields, (builder, alias) => {
+      const child = builder instanceof Formo ? builder : new Formo(builder.toSchema())
+      child.#def.alias = cleanAlias(alias)
+      // "form" should only be used once (Formo converts added forms to groups)
+      if (child.#def.driver === 'form') child.#def.driver = 'group'
+      return child
+    })
   }
 
   static #toFormo(input: FieldInput | Formo): Formo {
@@ -262,7 +298,8 @@ export class Formo {
 
   #set(key: string, value: unknown) {
     if (key === 'fields') {
-      for (const f of toArray(value as FieldInput[])) this.#append(Formo.#toFormo(f))
+      const list = isPlainObject(value) ? Formo.#childList(value as FieldsInput) : toArray(value as FieldInput[])
+      for (const f of list) this.#append(Formo.#toFormo(f))
       return
     }
     if (key === 'alias') value = cleanAlias(value as string)
@@ -533,11 +570,11 @@ export class Formo {
 
   /* ---- Output ------------------------------------------------------------ */
 
-  /** The plain definition (what <FormoForm> renders) */
-  toSchema(): FieldDef {
+  /** The plain definition (what <FormoForm> renders) — children as a list, like PHP `to_array()` */
+  toSchema(): FieldSchema {
     // Reading the version makes computed()s that call toSchema() reactive to mutations
     void this.version.value
-    const def: FieldDef = { ...this.#def }
+    const def: FieldSchema = { ...this.#def } as FieldSchema
     if (this.#fields.length || this.#def.driver === 'form' || this.#def.driver === 'group') {
       def.fields = this.#fields.map((f) => f.toSchema())
     }
@@ -545,11 +582,11 @@ export class Formo {
   }
 
   /** Formo `to_array()` */
-  toArray(): FieldDef {
+  toArray(): FieldSchema {
     return this.toSchema()
   }
 
-  toJSON(): FieldDef {
+  toJSON(): FieldSchema {
     return this.toSchema()
   }
 }
