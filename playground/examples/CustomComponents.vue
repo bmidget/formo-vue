@@ -24,12 +24,12 @@ const definition = Formo.form({ alias: 'review' })
   .add('rating', {
     component: StarRating,
     props: { max: 5 },
-    rules: [['not_empty'], ['min_value', [':value', 1]]],
+    rules: 'required|min_value:1',
     errorMessages: { required: 'Please pick a rating', min_value: 'Please pick a rating' },
   })
   // 2. A new driver registered app-wide in main.ts (createFormo({ drivers: { tags } }))
   .add('tags', 'tags', ['vue', 'forms'], {
-    rules: [['min_items', [':value', 2]]],
+    rules: 'min_items:2',
     message: 'Enter adds a tag, Backspace removes the last one',
   })
   // 3. By name — what you'd use in JSON from a server: { "component": "color-swatches" }

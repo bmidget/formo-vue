@@ -23,7 +23,7 @@ export interface FormoOptionGroup {
 export type FormoOptionItem = FormoOption | FormoOptionGroup
 
 /**
- * Everything `opts` accepts. Same shapes Formo (PHP) accepted plus friendlier JS ones:
+ * Everything `opts` accepts:
  *
  *  - `{ run: 'Running', swim: 'Swimming' }`                 value => label
  *  - `{ Exercise: { run: 'Running' }, Dates: {...} }`       optgroups
@@ -62,13 +62,13 @@ export interface RuleContext {
   label: string
   /** Values of the whole form */
   values: Record<string, any>
-  /** Values of the group the field lives in (what Formo called `:form_val` / `:validation`) */
+  /** Values of the group the field lives in */
   parentValues: Record<string, any>
   /** The form controller */
   form: FormoController
   /** The rule name currently running */
   rule: string
-  /** The rule's params as written (before `@field` / `:value` substitution) */
+  /** The rule's params as written (before `@field` references are resolved) */
   rawParams?: unknown[]
 }
 
@@ -88,8 +88,8 @@ export type RuleItem =
   | string
   /** `(value, params, ctx) => true | false | 'message'` */
   | RuleFn
-  /** Kohana/Formo tuple: `['min_length', [':value', 3]]`, `[myFn, [':value', ':form_val']]` */
-  | [string | ((...args: any[]) => any), unknown[]?]
+  /** A tuple: `['between', [1, 10]]`, `['regex', [/^[a-z]+$/]]`, `[myRule, [3]]` (`myRule(value, [3], ctx)`) */
+  | [string | RuleFn, unknown[]?]
   /**
    * Explicit object with an optional per-rule message, and a `label` describing
    * the requirement in checklists (`'At least one symbol'`)
@@ -112,10 +112,6 @@ export interface RuleSpec {
   params: unknown[]
   /** Inline implementation (custom function rules) */
   fn?: RuleFn
-  /** A raw callable used Kohana-style: called with the substituted params (`fn(...params)`) */
-  callable?: (...args: any[]) => any
-  /** `true` when params use Kohana pseudo-params (`:value`, `:form_val`...) */
-  kohana?: boolean
   message?: string
   /** Requirement text for checklists */
   label?: string
@@ -124,7 +120,7 @@ export interface RuleSpec {
 
 /**
  * How a field shows its validation state:
- *  - `first`     the first failing rule's message (default, like Formo/Kohana)
+ *  - `first`     the first failing rule's message (default)
  *  - `all`       every failing rule's message
  *  - `checklist` every rule as a live requirement list (✗ / ✓), e.g. password rules
  */
@@ -170,7 +166,8 @@ export type CallbacksInput = {
 }
 
 export type FilterFn = (value: any) => any
-export type FilterInput = FilterFn | string | [FilterFn, unknown[]?]
+/** A function, a named filter (`'trim'`, `'lower'`, `'int'`, `'null_if_empty'`…), or `[fn, params]` → `fn(value, ...params)` */
+export type FilterInput = FilterFn | string | [(value: any, ...params: any[]) => any, unknown[]?]
 
 /* -------------------------------------------------------------------------- */
 /*  Field definitions                                                          */
@@ -235,7 +232,7 @@ export interface ModelBinding {
 /**
  * A field / group / form definition.
  *
- * Mirrors Formo's field parameters (`alias`, `driver`, `val`, `opts`, `attr`,
+ * Field parameters (`alias`, `driver`, `val`, `opts`, `attr`,
  * `rules`, `label`, `render`, `editable`, `message`, `callbacks`, `filters`,
  * `fields`, `blueprint` ...) and adds Vue-specific ones (`component`, `props`,
  * `model`, `view`, `classes`, `components`, `theme`).
@@ -244,11 +241,11 @@ export interface FieldDef {
   alias?: string | number
   /** `input`, `input|email`, `textarea`, `select`, `checkbox`, `checkboxes`, `radios`, `set`, `datalist`, `file`, `button`, `group`, `form` or any driver you register */
   driver?: string
-  /** Initial value (Formo `val`). `value` is accepted as an alias */
+  /** Initial value. `value` is accepted as an alias */
   val?: unknown
   value?: unknown
   label?: string | false | null
-  /** Help text rendered under the control (Formo `message`) */
+  /** Help text rendered under the control */
   message?: string
   opts?: FormoOptionsSource
   /** Alias of `opts` */
@@ -276,7 +273,7 @@ export interface FieldDef {
   /**
    * Make this field — or, on a group, the whole subform — fully optional:
    * no rules, group rules or callbacks run inside it and existing errors clear
-   * (Formo's `ignore`). It stays rendered; combine with `render` to also hide it.
+   * It stays rendered; combine with `render` to also hide it.
    */
   ignore?: Condition
   /** Like `ignore`, and also drop the values from what's submitted (Laravel `exclude_if`) */
@@ -289,8 +286,7 @@ export interface FieldDef {
   ignores?: string | string[]
   /** Same as `ignores`, and the targets' values are dropped from what's submitted */
   excludes?: string | string[]
-  /** (PHP's json_encode turns empty arrays into `[]`, which is accepted and ignored) */
-  callbacks?: CallbacksInput | never[]
+  callbacks?: CallbacksInput
   filters?: FilterInput[]
   /** Position when added: index, or `['before' | 'after', alias]` */
   order?: number | ['before' | 'after', string | number]
@@ -304,10 +300,9 @@ export interface FieldDef {
   /** How the control component receives/emits its value */
   model?: ModelBinding
   /**
-   * The view that lays this node out — Formo's `template`. A view name from the
+   * The view that lays this node out. A view name from the
    * theme (`'field'`, `'inline'`, `'fieldset'`, `'bare'`, `'group'`, or one the
    * theme adds, like `'floating'`), a component, or `false` for the bare control.
-   * `template` (from PHP `to_array()`) is read as the view name.
    */
   view?: ComponentRef | false
   /** Classes for this node only, merged over the theme's */
@@ -317,7 +312,7 @@ export interface FieldDef {
 
   /**
    * Children. Either an object keyed by alias — `{ email: { required: true }, bio: 'textarea',
-   * address: { fields: { street: {} } } }` — or a list (`[{ alias: 'email' }, 'bio']`, PHP `to_array()`)
+   * address: { fields: { street: {} } } }` — or a list (`[{ alias: 'email' }, 'bio']`)
    */
   fields?: FieldInput[] | FieldsInput
   /** Component overrides that cascade to every field inside this group */
@@ -338,11 +333,11 @@ export interface FieldDef {
   addLabel?: string
   removeLabel?: string
 
-  /** Anything else, like Formo's `set('my_var', ...)` */
+  /** Anything else (your own variables: `builder.set('my_var', …)`) */
   [key: string]: unknown
 }
 
-/** A definition as the builder outputs it (`toSchema()` / `toArray()`): children are always a list */
+/** A definition as the builder outputs it (`toSchema()`): children are always a list */
 export interface FieldSchema extends FieldDef {
   fields?: FieldSchema[]
 }
@@ -417,7 +412,7 @@ export interface FieldNode {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Built-in field view names (Formo's `field_template` / `checkbox_template`…):
+ * Built-in field view names:
  *  - `field`     label above the control (default)
  *  - `inline`    control, then its label (single checkbox)
  *  - `fieldset`  a legend over a group of controls (radios, checkboxes)
@@ -427,8 +422,7 @@ export interface FieldNode {
 export type FieldViewName = 'field' | 'inline' | 'fieldset' | 'bare' | (string & {})
 
 /**
- * A driver describes how a kind of field behaves — the same job Formo's
- * `Formo_Driver_*` classes did. Register your own through the plugin or the
+ * A driver describes how a kind of field behaves. Register your own through the plugin or the
  * `drivers` prop: `{ rating: { component: StarRating, defaultValue: () => 0 } }`.
  */
 export interface FormoDriver {
@@ -439,7 +433,7 @@ export interface FormoDriver {
    * (the `input` driver: numbers for `number` / `range`)
    */
   parse?: (value: unknown, node: FieldNode) => unknown
-  /** Groups / forms contain other fields (Formo `is_a_parent`) */
+  /** Groups / forms contain other fields */
   parent?: boolean
   /**
    * The view its fields use by default: `field` (label above, default), `inline`
@@ -449,7 +443,7 @@ export interface FormoDriver {
   view?: FieldViewName | false | ((node: FieldNode) => FieldViewName | false)
   /** Value used when the definition has no `val` */
   defaultValue?: (node: FieldNode) => unknown
-  /** Rules automatically added before validation (Formo `pre_validate`) */
+  /** Rules automatically added before validation */
   rules?: (node: FieldNode, config: FormoConfig) => RuleItem[] | undefined
   /** Render the value as text when `editable: false` */
   display?: (value: unknown, node: FieldNode, options: FormoOptionItem[]) => string
@@ -474,19 +468,26 @@ export type ValidationMode =
   | 'submit'
 
 export interface FormoConfig {
-  /** Auto-generate `id`s for controls (Formo `auto_id`) */
+  /** Auto-generate `id`s for controls */
   autoId: boolean
-  /** Namespace field names and values by their group (Formo `namespaces`) */
+  /** Namespace field names and values by their group */
   namespaces: boolean
+  /**
+   * What input names start with: the form alias by default (`user[email]`, like
+   * Formo), another root (`'account'` → `account[email]`), or `false` for bare
+   * names (`email`, `address[street]`) — what a Laravel FormRequest or an API
+   * validates, so a native post (JavaScript off) reaches the same rules.
+   */
+  namePrefix?: string | false
   /** Turn `first_name` into `First name` when there is no label */
   humanizeLabels: boolean
   /**
-   * Label overrides for every locale, like Formo's `label_message_file`:
+   * Label overrides for every locale:
    * `{ 'address.street': 'Street', email: 'E-mail' }`. Per-locale: `locales.fr.labels`.
    */
   labels: Record<string, string>
   /**
-   * Validation message overrides for every locale, like Formo's `validation_message_file`.
+   * Validation message overrides for every locale.
    * Keys: `rule`, `alias.rule`, `path.rule`, `alias.default`. Per-locale: `locales.fr.validation`.
    * Placeholders: `:field` (or Laravel's `:attribute`), `:value`, `:param1`…, `:other`,
    * Laravel-named params (`:min`, `:max`, `:size`, `:values`…), or the `{field}` style.
@@ -509,17 +510,17 @@ export interface FormoConfig {
   t?: (key: string, params: Record<string, unknown>) => string | undefined
   /**
    * Translate free texts — explicit labels, help texts, option labels,
-   * placeholders, legends, button texts (Kohana's `__('Email')` style, where the
-   * text itself is the key). Return the text unchanged when there's no translation.
+   * placeholders, legends, button texts — the text itself is the key, like Laravel's
+   * `__('Email')`. Return the text unchanged when there's no translation.
    */
   translate?: (text: string) => string
-  /** Rules added to inputs based on their `type` (Formo `input_rules`) */
+  /** Rules added to inputs based on their `type` */
   inputRules: Record<string, RuleItem[]>
   /** Translate HTML constraint attributes (`required`, `minlength`, `maxlength`, `pattern`) into rules */
   htmlConstraintRules: boolean
   /** When to validate */
   validationMode: ValidationMode
-  /** Stop at the first failing rule of a field (Kohana behaviour). Ignored by `all` / `checklist` fields */
+  /** Stop at the first failing rule of a field. Ignored by `all` / `checklist` fields */
   bails: boolean
   /** Default error display for every field (`first`, `all`, `checklist`) */
   errorDisplay: ErrorDisplay
@@ -597,14 +598,14 @@ export interface FormoClasses {
 }
 
 /**
- * The views of a theme — the Vue counterparts of Formo's PHP view files. Every
+ * The views of a theme — what lays a form out. Every
  * view gets a `formo` prop (the state of what it renders) and fills its slots:
  *
- *  - `form`          inside `<form>` (≈ form_template.php) — slots `before`, `default`, `actions`
- *  - `group`         a subform (≈ group_template.php) — slot `default` (the fields)
+ *  - `form`          inside `<form>` — slots `before`, `default`, `actions`
+ *  - `group`         a subform — slot `default` (the fields)
  *  - `blueprint`     repeatable rows — slot `row` (`{ row }`), once per row
  *  - `blueprintRow`  one row (gets `row` too) — slot `default` (the row's fields)
- *  - `field`, `inline`, `fieldset`, `bare` (≈ field_template.php / checkbox_template.php) —
+ *  - `field`, `inline`, `fieldset`, `bare` —
  *                    slots `label`, `input`, `help`, `errors`, `checklist`
  *  - `label`, `help`, `errors`, `checklist`, `uneditable` — the pieces of a field
  *  - `errorSummary`  `<FormoErrorSummary>`
@@ -647,7 +648,7 @@ export interface FormoThemeInput extends FormoThemeLayer {
 }
 
 /**
- * A complete theme — Formo's template directory: the views, the controls and the
+ * A complete theme: the views, the controls and the
  * classes they use. Made with `defineTheme()`; the built-in one is `defaultTheme` (Tailwind).
  */
 export interface FormoTheme {
@@ -703,7 +704,7 @@ export interface FormoResolvedOptions {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Which part of a field/subform to render — Formo's `render()` / `input()` / `label()` / `error()`:
+ * Which part of a field/subform to render:
  *  - `field`     label, control, help, errors (a subform: the whole fieldset)
  *  - `input`     the control only
  *  - `label`, `errors`, `help`, `checklist`  just that piece
@@ -728,7 +729,7 @@ export type Condition =
   | ((ctx: FormoValueContext) => boolean)
   | { when: string; is?: unknown; not?: unknown; filled?: boolean }
 
-/** Something that can define a form: a builder, a plain definition or Formo PHP `to_array()` JSON */
+/** Something that can define a form: a builder, or a plain definition (or its JSON) */
 export type FormoDefinition = FieldInput
 
 /* -------------------------------------------------------------------------- */
@@ -876,6 +877,57 @@ export interface FormoSubmitContext {
    * `attr.action` / `attr.method`. 422 errors are mapped onto the fields.
    */
   request: (url?: string, options?: FormoRequestOptions) => Promise<FormoResponse>
+  /**
+   * Refuse the submit yourself (your API said no): the outcome is `rejected`.
+   * Errors go onto the fields (`{ email: 'Taken' }`, Laravel keys work), a string onto the form.
+   */
+  reject: (errors?: FormoErrorsInput | string) => void
+}
+
+/**
+ * How a submit ended:
+ *  - `success`   it went through — valid, and the handler / the server accepted it
+ *  - `invalid`   the browser's validation stopped it: nothing was sent, the errors are on screen
+ *  - `rejected`  it was sent, but refused — see `reason`
+ */
+export type FormoSubmitResult = 'success' | 'invalid' | 'rejected'
+
+/**
+ * Why a submit was rejected:
+ *  - `validation`  the server's validation (422), or errors the handler set (`setErrors`, `reject(errors)`)
+ *  - `session`     the session / CSRF token expired (419)
+ *  - `server`      any other unsuccessful response (4xx / 5xx)
+ *  - `handler`     the handler returned `false` or called `reject()` without errors
+ *  - `error`       the handler threw (a network error, a bug) — a form-level message is shown
+ */
+export type FormoRejectReason = 'validation' | 'session' | 'server' | 'handler' | 'error'
+
+export interface FormoOutcome {
+  result: FormoSubmitResult
+  /** `rejected` only */
+  reason?: FormoRejectReason
+  /** What was submitted (not for `invalid`: nothing was) */
+  values?: Record<string, any>
+  /** `success`: the response's data, or what the handler returned */
+  data?: unknown
+  /** The response of the request made during the submit, if any */
+  response?: FormoResponse
+  /** The form's errors afterwards (flat) */
+  errors: Record<string, string>
+  /** `error`: what was thrown */
+  error?: unknown
+}
+
+/** What to do after a submit — `<FormoForm @success @invalid @rejected @settled>`, or `useFormo(…, { onSuccess… })` */
+export interface FormoOutcomeHandlers {
+  /** It went through: the response's data (or the handler's return value) */
+  onSuccess?: (data: any, outcome: FormoOutcome) => unknown
+  /** The browser's validation stopped it — nothing was sent */
+  onInvalid?: (errors: Record<string, string>, outcome: FormoOutcome) => unknown
+  /** Sent, but refused: `outcome.reason` says why (the errors are already on the fields) */
+  onRejected?: (outcome: FormoOutcome) => unknown
+  /** After every submit, whatever happened (`outcome.result`) */
+  onSettled?: (outcome: FormoOutcome) => unknown
 }
 
 export interface FormoController<F = FormoFields> {
@@ -896,7 +948,7 @@ export interface FormoController<F = FormoFields> {
   readonly values: Record<string, any>
   /** Flat map of errors: `{ 'email': '...', 'address.zip': '...', '': 'form error' }` */
   readonly flatErrors: Record<string, string>
-  /** Nested errors in Formo's `errors()` format (`:self` for group/form errors) */
+  /** Nested errors (`:self` for group/form errors) */
   readonly errors: Record<string, any>
   /** Every message per path — fields with `errorDisplay: 'all' | 'checklist'` can have several */
   readonly allErrors: Record<string, string[]>
@@ -904,13 +956,15 @@ export interface FormoController<F = FormoFields> {
   readonly dirty: boolean
   readonly submitting: boolean
   readonly submitCount: number
+  /** How the last submit ended (`undefined` before the first one) */
+  readonly outcome: FormoOutcome | undefined
   readonly options: FormoResolvedOptions
 
   /** Get a value by path (no path: all values) */
   val(path?: string): any
   /** Set a value by path */
   val(path: string, value: unknown, validate?: boolean): void
-  /** Merge values into the form (Formo `load()`) */
+  /** Merge values into the form */
   load(values: Record<string, any>, validate?: boolean): void
   /** Values after applying each field's `filters` (what gets submitted) */
   getValues(): Record<string, any>
@@ -919,13 +973,15 @@ export interface FormoController<F = FormoFields> {
   /** Validate a single field */
   validateField(path: string): Promise<boolean>
   /**
-   * Validate and submit. Resolves to whether the form passed. Pass a handler to
-   * submit without a <form> element (parts rendered with <FormoRender>):
+   * Validate and submit. Resolves to whether it *succeeded* — valid, and not
+   * rejected by the handler or the server (the details: `form.outcome`). Pass a
+   * handler to submit without a <form> element (parts rendered with <FormoRender>):
    * `<button @click="form.submit(save)">` — `save(values, ctx)` runs once valid.
+   * A second call while one is in flight returns the same promise (no double posts).
    */
   submit(eventOrHandler?: Event | ((values: Record<string, any>, ctx: FormoSubmitContext) => unknown)): Promise<boolean>
   /**
-   * A component rendering one part of the form — Formo's `$form->address->render()`:
+   * A component rendering one part of the form:
    * `<component :is="form.render('address')" />`, `form.render('email', 'input')`.
    */
   render(path?: string, part?: FormoPart): Component
@@ -943,7 +999,7 @@ export interface FormoController<F = FormoFields> {
   clearErrors(): void
   /** Error for a path (fields and groups) */
   error(path: string): string | undefined
-  /** Find a rendered field/group by path, or by alias (searches recursively like Formo `find()`) */
+  /** Find a rendered field/group by path, or by alias (searched recursively) */
   find(pathOrAlias: string): RegisteredNode | undefined
   /** Resolved label of a rendered field */
   label(path: string): string
@@ -972,6 +1028,8 @@ export interface FormoController<F = FormoFields> {
   _onSubmit(handler: (values: Record<string, any>, ctx: FormoSubmitContext) => unknown): () => void
   /** @internal */
   _onInvalid(handler: (errors: Record<string, string>) => unknown): () => void
+  /** @internal Called with every submit's outcome */
+  _onOutcome(handler: (outcome: FormoOutcome) => unknown): () => void
 }
 
 /* -------------------------------------------------------------------------- */

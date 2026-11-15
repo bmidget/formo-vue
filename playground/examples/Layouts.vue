@@ -5,11 +5,11 @@
  *
  *   <FormoForm :form="form" />                               the whole form (automatic layout)
  *   <FormoForm :form="form"> …your layout… </FormoForm>       your own layout (default slot)
- *   <FormoField :field="form.fields.address" />              a subform       ($form->address->render())
- *   <FormoField :field="form.fields.email" />                a field         ($form->email->render())
+ *   <FormoField :field="form.fields.address" />              a subform
+ *   <FormoField :field="form.fields.email" />                a field
  *   <FormoField :field="…" v-slot="{ field }">               your own markup for the whole field, with the
  *     <FormoLabel :field="field" /> <FormoInput … />           theme's parts wherever you want them
- *     <FormoErrors … /> <FormoHelp … />                        ($form->email->label() / input() / error())
+ *     <FormoErrors … /> <FormoHelp … />                        (its label / control / errors / help)
  *   <FormoField :field="…"><template #input>…<FormoInput />  keep the view, take over one region (#label, #errors…)
  *   <FormoInput :field="form.fields.email" />                just the control, anywhere
  *   <FormoRest />                                            everything you haven't placed

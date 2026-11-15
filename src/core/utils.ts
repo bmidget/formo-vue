@@ -1,6 +1,3 @@
-/** The marker Formo (PHP) uses for "not set" values, ex: in `to_array()` output */
-export const NOTSET = '_NOTSET'
-
 export function isPlainObject(value: unknown): value is Record<string, any> {
   if (value === null || typeof value !== 'object') return false
   const proto = Object.getPrototypeOf(value)

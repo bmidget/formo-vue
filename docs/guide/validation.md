@@ -4,7 +4,7 @@ aside: false
 
 # Validation & Checklists
 
-`formo-vue` validates with VeeValidate under the hood and accepts Kohana rule arrays, VeeValidate rule strings/objects, sync & async functions, Zod schemas, and group-level rules.
+`formo-vue` validates with VeeValidate under the hood and accepts rule strings (`'required|min:3'`, Laravel-style) and objects, sync & async functions, Zod schemas, and group-level rules.
 
 ## Rules
 

@@ -229,7 +229,7 @@ export function asThemeLayer(value: unknown): FormoThemeLayer | undefined {
 }
 
 /**
- * Define a theme — Formo's template directory: the views that lay forms out,
+ * Define a theme: the views that lay forms out,
  * the controls, and the classes they use.
  *
  * ```ts

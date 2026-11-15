@@ -13,7 +13,7 @@ export const defaultConfig: FormoConfig = {
   // Overrides for every locale (translations live in `locales`)
   messages: {},
   translate: undefined,
-  // Formo's `input_rules`
+  // Rules each input type gets automatically
   inputRules: {
     email: ['email'],
     url: ['url'],

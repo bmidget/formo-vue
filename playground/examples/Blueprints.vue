@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Blueprints: a group whose fields are the template for repeatable rows.
- * Formo (PHP): `'blueprint' => TRUE` + `$form->pad_blueprint($rows)`.
+ * `blueprint: true` (or the builder's `padBlueprint(rows)`).
  * Values are arrays of row objects; names look like `profile[phones][0][number]`.
  *
  * Rendered by the theme (phones), or by your own markup (education, below):

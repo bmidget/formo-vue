@@ -3,11 +3,11 @@
  * Several rules on one field. They run in order; what you see depends on
  * `errorDisplay`:
  *
- *  - 'first'     (default) stops at the first failing rule — like Kohana
+ *  - 'first'     (default) stops at the first failing rule
  *  - 'all'       runs every rule and lists every failure
  *  - 'checklist' shows every rule as a requirement, ticked off live
  *
- * Notations mix freely on the same field: strings, Kohana arrays, vee objects,
+ * Notations mix freely on the same field: strings, tuples, vee objects,
  * functions, async rules and `{ rule, params, message, label }` objects.
  * `form.allErrors` holds every message per field.
  */
@@ -32,7 +32,7 @@ const form = useFormo(
       message: "errorDisplay: 'all' — try “a!”, then “admin”, then “ben”",
       rules: [
         'required',
-        ['min_length', [':value', 3]], // Kohana
+        ['min', [3]], // tuple
         { max: 16 }, // VeeValidate object
         'alpha_dash', // VeeValidate string
         notReserved, // function → custom message

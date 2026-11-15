@@ -2,7 +2,7 @@ import type { FilterInput, FormoConfig, FormoDriver, FieldNode } from '../types'
 import { defaultValueFor } from './drivers'
 import { deepClone, deepMerge, getPath, isPlainObject, joinPath, setPath } from './utils'
 
-/** Whether a group namespaces its children (Formo `namespaces` config, cascading) */
+/** Whether a group namespaces its children (`namespaces` config, cascading) */
 export function groupNamespaces(node: FieldNode, inherited: FormoConfig): boolean {
   return node.config?.namespaces ?? inherited.namespaces
 }
@@ -63,10 +63,7 @@ const namedFilters: Record<string, (v: any) => any> = {
   trim: (v) => (typeof v === 'string' ? v.trim() : v),
   lower: (v) => (typeof v === 'string' ? v.toLowerCase() : v),
   upper: (v) => (typeof v === 'string' ? v.toUpperCase() : v),
-  strtolower: (v) => (typeof v === 'string' ? v.toLowerCase() : v),
-  strtoupper: (v) => (typeof v === 'string' ? v.toUpperCase() : v),
   int: (v) => (v === '' || v === null || v === undefined ? null : Number.parseInt(String(v), 10)),
-  intval: (v) => (v === '' || v === null || v === undefined ? null : Number.parseInt(String(v), 10)),
   float: (v) => (v === '' || v === null || v === undefined ? null : Number.parseFloat(String(v))),
   number: (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
   null_if_empty: (v) => (v === '' ? null : v),
@@ -74,7 +71,7 @@ const namedFilters: Record<string, (v: any) => any> = {
   boolean: (v) => Boolean(v),
 }
 
-/** Apply Formo filters (functions, names like `trim`, or `[fn, [':value']]` tuples) */
+/** Apply filters: functions, names like `trim`, or `[fn, params]` tuples (`fn(value, ...params)`) */
 export function applyFilters(value: unknown, filters: FilterInput[]): unknown {
   let out = value
   for (const filter of filters) {
@@ -84,8 +81,8 @@ export function applyFilters(value: unknown, filters: FilterInput[]): unknown {
       if (!fn) throw new Error(`[formo] Unknown filter "${filter}"`)
       out = fn(out)
     } else if (Array.isArray(filter)) {
-      const [fn, params] = filter
-      out = params ? (fn as (...args: unknown[]) => unknown)(...params.map((p) => (p === ':value' ? out : p))) : fn(out)
+      const [fn, params = []] = filter
+      out = fn(out, ...params)
     }
   }
   return out

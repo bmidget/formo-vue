@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** The `inline` view — Formo's `checkbox_template.php`: the control, then its label text, in one `<label>` */
+/** The `inline` view — the control, then its label text, in one `<label>` (single checkboxes) */
 import type { FormoFieldState } from '../../composables/context'
 
 defineProps<{ formo: FormoFieldState }>()

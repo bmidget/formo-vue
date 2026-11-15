@@ -15,7 +15,7 @@ export interface FormoHandles {
   root: FormoFields
   /** The handle of an exact path (whatever is there now) */
   at: (path: string) => FormoHandle
-  /** By path, then by alias like Formo's `find()` */
+  /** By path, then by alias (searched recursively) */
   find: (pathOrAlias: string) => FormoHandle | undefined
   row: (blueprintPath: string, index: number) => FormoRowHandle
 }

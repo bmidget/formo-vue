@@ -142,11 +142,11 @@ describe('themes swap views, not just classes', () => {
     expect(wrapper.find('label[for="formo-raw"]').exists()).toBe(false)
   })
 
-  it('PHP `template` is the view name; unknown views warn and fall back', async () => {
+  it('a view by name in a JSON definition; unknown views warn and fall back', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const wrapper = mount(FormoForm, {
       props: {
-        form: Formo.fromJSON({ alias: 'p', fields: [{ alias: 'a', template: 'floating' }, { alias: 'b', template: 'nope' }, { alias: 'c', template: null }] }),
+        form: Formo.fromJSON({ alias: 'p', fields: [{ alias: 'a', view: 'floating' }, { alias: 'b', view: 'nope' }, { alias: 'c' }] }),
         theme: bootstrap,
       },
     })

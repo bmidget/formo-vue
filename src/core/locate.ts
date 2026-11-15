@@ -68,8 +68,8 @@ function walk(
 }
 
 /**
- * Find a node by path (`address.street`, `phones[0].number`) or — like Formo's
- * `find()` — by alias anywhere in the form (shallowest match).
+ * Find a node by path (`address.street`, `phones[0].number`) or by alias
+ * anywhere in the form (shallowest match).
  */
 export function locate(
   root: FieldNode,

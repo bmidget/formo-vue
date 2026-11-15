@@ -59,7 +59,7 @@ describe('defining a form with a nested object', () => {
     expect(aliases(schema.fields![1].fields)).toEqual(['street', 'city'])
     expect(schema.fields![2]).toMatchObject({ alias: 'billing', label: 'Billing' })
     expect(aliases(schema.fields![2].fields)).toEqual(['street', 'zip'])
-    // Round-trips like PHP to_array()
+    // Round-trips through JSON
     expect(Formo.fromJSON(JSON.parse(JSON.stringify(form))).toSchema()).toEqual(schema)
   })
 

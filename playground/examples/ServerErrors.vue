@@ -52,7 +52,7 @@ const form = useFormo(
     .add('login', 'button', { label: 'Sign in', attr: { type: 'submit', class: 'w-full' } }),
 )
 
-/** Pretend server: answers like a Laravel/Kohana controller returning errors */
+/** Pretend server: answers like a Laravel controller returning errors */
 async function submit(values: Record<string, any>, { setErrors }: FormoSubmitContext) {
   await new Promise((r) => setTimeout(r, 900))
   if (values.username === 'ben') {

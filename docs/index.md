@@ -22,8 +22,8 @@ hero:
 features:
   - title: Forms as Objects
     details: Define fields, groups, subforms, and repeatable blueprints with a plain nested object or the chainable Formo builder.
-  - title: VeeValidate + Kohana Rules
-    details: Use Kohana-style rule arrays, VeeValidate strings, functions, async validators, Zod schemas, and live requirement checklists.
+  - title: VeeValidate + Laravel-style Rules
+    details: Use rule strings and objects, Laravel's conditional rules, functions, async validators, Zod schemas, and live requirement checklists.
   - title: Nuxt UI & shadcn-vue Ready
     details: Bring your own UI library via formo-vue/nuxt-ui or the shadcn-vue registry item, or customize every view and control.
   - title: Laravel & i18n Built In

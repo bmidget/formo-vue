@@ -10,7 +10,7 @@ import { Formo, FormoForm, useFormo } from 'formo-vue'
 const address = Formo.form()
   .add('street')
   .add('city')
-  .add('zip', { rules: [['regex', [':value', '/^\\d{5}$/']]], errorMessages: { regex: 'Zip must be 5 digits' } })
+  .add('zip', { rules: [['regex', [/^\d{5}$/]]], errorMessages: { regex: 'Zip must be 5 digits' } })
 
 const definition = Formo.form({ alias: 'user' })
   .add('first_name', { required: true })
@@ -29,7 +29,7 @@ const form = useFormo(definition)
 
 const actions = [
   { label: 'Add a “company” field after last name', run: () => definition.add('company', { order: ['after', 'last_name'], message: 'Added at runtime' }) },
-  { label: 'Make phone required', run: () => definition.find('phone')?.addRule('not_empty') },
+  { label: 'Make phone required', run: () => definition.find('phone')?.addRule('required') },
   {
     label: 'Move email to the top',
     run: () => {

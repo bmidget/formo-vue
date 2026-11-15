@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * Radios and checkbox lists — Formo's `opts/radios_template.php`,
- * `opts/checkboxes_template.php` and `opts/set_template.php`.
+ * Radios and checkbox lists — the `radios`, `checkboxes` and `set` drivers.
  *
  *  - `radios`      → single value
  *  - `checkboxes`  → array value

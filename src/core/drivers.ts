@@ -19,8 +19,7 @@ const displayOptions = (value: unknown, _node: FieldNode, options: FormoOptionIt
     .join(', ')
 
 /**
- * The built-in drivers. Each one is the Vue equivalent of a `Formo_Driver_*`
- * class: it picks the control component and describes labels, default values,
+ * The built-in drivers. Each one picks the control component and describes labels, default values,
  * automatic rules and how to display uneditable values.
  */
 export const defaultDrivers: Record<string, FormoDriver> = {
@@ -32,7 +31,7 @@ export const defaultDrivers: Record<string, FormoDriver> = {
     // hidden: the control alone; buttons: no label; everything else: label above
     view: (node) => (node.type === 'hidden' ? false : NO_LABEL_TYPES.has(node.type ?? '') ? 'bare' : 'field'),
     defaultValue: (node) => (node.type === 'number' || node.type === 'range' ? null : ''),
-    // Formo `input_rules`: html5 types get validation rules automatically
+    // `config.inputRules`: html5 types get validation rules automatically
     rules: (node, config) => config.inputRules[node.type ?? 'text'],
     // number / range: a number (or null), whatever the control emits (UI libraries' inputs emit strings)
     parse: (value, node) => {
@@ -59,7 +58,7 @@ export const defaultDrivers: Record<string, FormoDriver> = {
     defaultValue: () => '',
   },
 
-  /** A single boolean checkbox (Formo `checkbox` / `bool`) */
+  /** A single boolean checkbox (`checkbox` / `bool`) */
   checkbox: {
     component: markBuiltin(FormoCheckboxControl),
     view: 'inline',

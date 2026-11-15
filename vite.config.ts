@@ -22,10 +22,13 @@ export default defineConfig(({ mode }) => {
         emptyOutDir: true,
         sourcemap: true,
         lib: {
-          // formo-vue, and the formo-vue/nuxt-ui subpath (which never imports @nuxt/ui: you pass the components)
+          // formo-vue, the formo-vue/nuxt-ui subpath (which never imports @nuxt/ui: you pass the components)
+          // and formo-vue/schema
           entry: {
             'formo-vue': fileURLToPath(new URL('./src/index.ts', import.meta.url)),
             'nuxt-ui': fileURLToPath(new URL('./src/nuxt-ui/index.ts', import.meta.url)),
+            // framework-free: models & schemas → form definitions (no Vue, no DOM)
+            schema: fileURLToPath(new URL('./src/schema/index.ts', import.meta.url)),
           },
           formats: ['es'],
           fileName: (_format, name) => `${name}.js`,

@@ -1,7 +1,7 @@
 import type { FormoLocaleMessages, FormoUiStrings } from '../../types'
 
 /**
- * English — the built-in default (Kohana's messages/validation.php wording).
+ * English — the built-in default.
  *
  * Placeholders: `:field` (label), `:value`, `:param1`…, `:params`, `:other`.
  * Laravel names work too (`:attribute`, `:min`, `:max`, `:size`, `:values`…),
@@ -58,9 +58,15 @@ export const validation: Record<string, string> = {
   letters: ':field must contain at least one letter',
   numbers: ':field must contain at least one number',
   symbols: ':field must contain at least one symbol',
+  accepted: ':field must be accepted',
+  gt: ':field must be greater than :param1',
+  gte: ':field must be :param1 or more',
+  lt: ':field must be less than :param1',
+  lte: ':field must be :param1 or less',
   // Request errors (form-level)
   csrf_mismatch: 'Your session has expired. Please refresh the page and try again.',
   request_failed: 'Something went wrong (:status). Please try again.',
+  submit_failed: 'Something went wrong. Please try again.',
 }
 
 /** How rules read in a requirements checklist (`errorDisplay: 'checklist'`) */
@@ -90,6 +96,11 @@ export const requirements: Record<string, string> = {
   letters: 'At least one letter',
   numbers: 'At least one number',
   symbols: 'At least one symbol',
+  accepted: 'Accepted',
+  gt: 'Greater than :param1',
+  gte: ':param1 or more',
+  lt: 'Less than :param1',
+  lte: ':param1 or less',
 }
 
 export const ui: FormoUiStrings = {

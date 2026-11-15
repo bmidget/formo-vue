@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * The `field` view — Formo's `field_template.php`: label above the control,
+ * The `field` view — label above the control,
  * then help, checklist and error. Every piece comes through a slot, already
  * rendered by Formo (or by the template's own slots, like `#input`).
  */

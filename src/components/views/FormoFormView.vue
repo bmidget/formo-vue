@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * The `form` view — Formo's `form_template.php`, inside the `<form>` element
+ * The `form` view — inside the `<form>` element
  * (which <FormoForm> keeps: submit, CSRF, `disabled`): the form's own error,
  * then the `before`, default (the fields) and `actions` slots.
  */

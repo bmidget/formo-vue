@@ -6,7 +6,7 @@ import Validation from './Validation.vue'
 import CustomComponents from './CustomComponents.vue'
 import Blueprints from './Blueprints.vue'
 import ServerErrors from './ServerErrors.vue'
-import FromPhp from './FromPhp.vue'
+import FromModels from './FromModels.vue'
 import Theming from './Theming.vue'
 import Checklists from './Checklists.vue'
 import MultipleRules from './MultipleRules.vue'
@@ -34,7 +34,7 @@ const list: Array<Omit<Example, 'file'> & { file: string }> = [
     id: 'getting-started',
     title: 'Getting started',
     section: 'Basics',
-    summary: 'A form defined as one object (or with the PHP-style builder), rendered by <FormoForm>, with the live form values and errors next to it.',
+    summary: 'A form defined as one object (or with the builder), rendered by <FormoForm>, with the live form values and errors next to it.',
     file: 'GettingStarted.vue',
     component: GettingStarted,
   },
@@ -66,7 +66,7 @@ const list: Array<Omit<Example, 'file'> & { file: string }> = [
     id: 'validation',
     title: 'Validation',
     section: 'Validation',
-    summary: 'VeeValidate under the hood. Kohana rule arrays, vee strings/objects, functions, async rules, zod, group rules, messages.',
+    summary: 'VeeValidate under the hood. Rule strings and objects, Laravel rules, functions, async rules, zod, group rules, messages.',
     file: 'Validation.vue',
     component: Validation,
   },
@@ -114,7 +114,7 @@ const list: Array<Omit<Example, 'file'> & { file: string }> = [
     id: 'theming',
     title: 'Theming',
     section: 'Customizing',
-    summary: 'Themes swap the views (Formo’s PHP templates), controls and classes — floating labels, horizontal forms — or just restyle with class overrides.',
+    summary: 'Themes swap the views, controls and classes — floating labels, horizontal forms — or just restyle with class overrides.',
     file: 'Theming.vue',
     component: Theming,
   },
@@ -159,12 +159,12 @@ const list: Array<Omit<Example, 'file'> & { file: string }> = [
     component: Laravel,
   },
   {
-    id: 'from-php',
-    title: 'From PHP to_array()',
+    id: 'from-models',
+    title: 'Forms from models (workbench)',
     section: 'Advanced',
-    summary: 'Render JSON from Formo (PHP) $form->to_array() directly — a gradual migration path.',
-    file: 'FromPhp.vue',
-    component: FromPhp,
+    summary: 'Pick a source (Laravel rules, backend model, JSON Schema, OpenAPI, Zod) and the options, then use the form: validation in the browser, a submit to a fake Laravel backend (unique, 422, 419, 500), the request and response, where each error comes from — and the code to copy.',
+    file: 'FromModels.vue',
+    component: FromModels,
   },
 ]
 

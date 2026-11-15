@@ -1,18 +1,19 @@
 # formo-vue
 
-[Formo](../kohana-formo)'s "forms as objects", rebuilt for **Vue 3**.
+Forms as objects, for **Vue 3**.
 
 > **What Formo is (and isn't):** Formo is **not a UI library**—it doesn't lock you into a closed widget kit. Instead, Formo makes working with **forms, validation, state, and styling** effortless: define your form once as an object, and render it with the built-in Tailwind theme, **Nuxt UI**, **shadcn-vue**, or your own components.
 
-- **A form is one nested object**: every field keyed by its alias, subforms nested under `fields`. The **`Formo` builder** (a port of the PHP object API: `add`, `find`, `order`, `subform`, `add_rules_fields`, `pad_blueprint`…) is still there, for changing forms at runtime
+- **A form is one nested object**: every field keyed by its alias, subforms nested under `fields`. The **`Formo` builder** (`add`, `find`, `order`, `subform`, `addRulesFields`, `padBlueprint`…) is there for changing forms at runtime
 - **`form.fields` mirrors the definition**: `<FormoField :field="form.fields.email">` renders any field, subform or repeatable group, anywhere, with typed handles
-- **Themes swap views**, like Formo's PHP views (`form_template.php`, `field_template.php`…): a theme is the set of view components that lay a form out, plus its controls and classes
+- **Themes swap views**: a theme is the set of view components that lay a form out (form, group, field, label, errors…), plus its controls and classes
 - **Rebuild a field's markup, keep its parts**: `<FormoField :field v-slot="{ field }">` replaces the whole field with your markup, and `<FormoLabel>`, `<FormoInput>`, `<FormoErrors>`… render the theme's pieces wherever you put them — wired, validated, accessible
-- **Validation runs on [VeeValidate](https://vee-validate.logaretm.com/v4/)**. Kohana rule arrays keep working, alongside vee rule strings/objects, functions, async rules and Zod/Valibot schemas
+- **Validation runs on [VeeValidate](https://vee-validate.logaretm.com/v4/)**: rule strings (`'required|min:3'`, Laravel-style, Laravel's conditional rules included) and objects, functions, async rules and Zod/Valibot schemas
 - **Error display per field**: the first error (default), all of them, or a live **requirements checklist** (✗ → ✓ as you type)
-- **Optional subforms**: a "Same as billing address" checkbox can make a whole subform optional (Formo's `ignore`), plus Laravel's `required_if` / `required_with` / `exclude_if`…
+- **Optional subforms**: a "Same as billing address" checkbox can make a whole subform optional (`ignore`), plus Laravel's `required_if` / `required_with` / `exclude_if`…
 - **i18n**: live locale switching, built-in en/fr/es/de/nl, adapters for **vue-i18n** and **Laravel lang files** (laravel-vue-i18n), 40+ locales via @vee-validate/i18n
 - **CSRF protection built for Laravel**: Blade `@csrf`/meta tokens, Sanctum's `XSRF-TOKEN` cookie, 419 refresh + retry, 422 errors mapped onto fields
+- **Forms from models & schemas**: a form straight from Laravel FormRequest rules, a backend model (IR JSON v1, e.g. an Inertia prop), JSON Schema, OpenAPI or Zod — all fields or `only` / `except`, with overrides, types, labels and validation included. `formo-vue/schema` is plain TypeScript (no Vue, no DOM), ready for other renderers
 - **Nuxt UI and shadcn-vue**: render fields with [Nuxt UI](docs/nuxt-ui.md) (`formo-vue/nuxt-ui`, `@nuxt/ui` never required) or [your shadcn-vue components](docs/shadcn-vue.md) (a registry item) — every field in the library's field layout, still one form object
 - **Tailwind** styles the built-in theme; class overrides merge with tailwind-merge
 - **Any component can be swapped**: views and controls, per field, per driver, per form/group, app-wide, by name, or with a slot
@@ -25,7 +26,7 @@ import StarRating from './StarRating.vue'
 const form = useFormo({
   alias: 'review',
   fields: {
-    title: { rules: [['not_empty'], ['max_length', [':value', 80]]] },
+    title: { rules: 'required|max:80' },
     email: { driver: 'email', required: true },
     rating: { component: StarRating, rules: 'required|min_value:1' },
     price: { driver: 'number' },
@@ -65,20 +66,20 @@ async function save(values) {
 - [Playground (`bun run dev`)](#playground) · [Supported platforms](#supported-platforms)
 - [Project layout](#project-layout)
 - [Installing in an app](#installing-in-an-app)
-- [Defining forms](#defining-forms) · [PHP → Vue API map](#php--vue-api-map)
+- [Defining forms](#defining-forms) · [Builder API](#builder-api)
 - [Field types (drivers)](#field-types-drivers) · [Field parameters](#field-parameters)
-- [Rendering: `<FormoForm>` and `useFormo()`](#rendering-formoform-and-useformo) · [**Rendering parts anywhere: `<FormoField>`**](#rendering-parts-anywhere-formofield) · [**Your own markup: the parts**](#your-own-markup-the-parts)
+- [Rendering: `<FormoForm>` and `useFormo()`](#rendering-formoform-and-useformo) · [Submit outcomes](#submit-outcomes-success-invalid-rejected-settled) · [Values from outside](#values-from-outside) · [**Rendering parts anywhere: `<FormoField>`**](#rendering-parts-anywhere-formofield) · [**Your own markup: the parts**](#your-own-markup-the-parts)
 - [Validation](#validation)
 - [Error display & checklists](#error-display--checklists)
 - [Optional subforms & conditional rules](#optional-subforms--conditional-rules)
 - [i18n](#i18n)
 - [CSRF & Laravel](#csrf--laravel)
+- [**Forms from models & schemas**](#forms-from-models--schemas)
 - [**Themes & views**](#themes--views)
 - [**UI libraries: Nuxt UI & shadcn-vue**](#ui-libraries-nuxt-ui--shadcn-vue)
 - [Overriding components](#overriding-components) · [`defineControl()`](#any-component-as-a-control-definecontrol)
 - [Subforms, namespaces, repeatable groups](#subforms-namespaces-and-repeatable-groups)
-- [Migrating from PHP gradually](#migrating-from-php-gradually)
-- [Differences from Formo (PHP)](#differences-from-formo-php)
+- [Good to know](#good-to-know)
 
 ---
 
@@ -100,11 +101,11 @@ bun run dev            # → http://localhost:5173 (checks the native toolchain 
 
 - **Preview**: the component running.
 - **Vue component**: its complete source, ready to copy.
-- **POST body**: what a native submit of each form would send, namespaced like Formo's, so a Kohana controller's `$form->load($_POST)` or Laravel's `$request->input('user.address.street')` keeps working.
+- **POST body**: what a native submit of each form would send — namespaced names (`user[address][street]`), read by Laravel as `$request->input('user.address.street')`.
 
 | Example | Shows |
 | --- | --- |
-| Getting started | A form as one object, Kohana + vee rules, filters, async submit |
+| Getting started | A form as one object, rule strings and objects, filters, async submit |
 | **Render parts anywhere** | Your own layout with `form.fields` handles: fields side by side, a control wrapped by a slot, one field laid out by hand, a subform's inner layout, custom blueprint rows, `<FormoRest />`, and a field rendered by a card outside the `<form>` |
 | Field types | Every driver, HTML5 auto-rules, optgroups, multiple, set, file, uneditable |
 | Subforms & form objects | Namespaces, `namespaces: false`, ordering, `subform()`, mutating the builder live |
@@ -120,7 +121,7 @@ bun run dev            # → http://localhost:5173 (checks the native toolchain 
 | **Translations (i18n)** | Live switching between en / fr / es / de / nl / ja: labels, options, placeholders, messages, checklists, UI strings; errors re-translated in place |
 | Repeatable groups | Blueprints: add/remove rows, min/max, rules over the list |
 | Laravel & CSRF | A Sanctum SPA form and a Blade-style native post against a **mock Laravel backend** running in the dev server: XSRF cookie priming, 419 → refresh → retry, 422 mapping, `_token` / `_method`, with a live server request log |
-| From PHP `to_array()` | Live-editable JSON from the PHP library rendered as-is |
+| **Forms from models** | A workbench: the same user as Laravel rules, a backend model (IR JSON), JSON Schema, OpenAPI or Zod (JSON sources editable live); pick `mode`, `readOnly`, `validation`, `only` / `except`; fill the form in and submit it to a **fake Laravel backend in the page** (server-side `unique`, 422 mapped onto fields, 419 / 500), with the request and response shown; every error tagged Formo rule / Zod `.refine()` / object-level refinement / server; **Post it like JavaScript is off** compares the browser's errors with the server's, field by field; the Code tab gives the component to copy |
 
 Other scripts:
 
@@ -129,6 +130,7 @@ bun run check             # everything below except the builds
 bun run check:native      # this machine's native toolchain binaries are installed & load (runs before dev/build/test)
 bun run check:platforms   # the lockfile installs on macOS (arm64/x64) and Linux (x64/arm64)
 bun run check:deps        # every imported package (and required peer) is declared in package.json
+bun run check:pure        # formo-vue/schema stays framework-free: no Vue / DOM / Node / packages / import.meta, type-checks without the DOM lib
 bun run check:registry    # registry/r/formo.json (shadcn-vue) is built from registry/shadcn-vue/formo
 bun run build:registry    # rebuild it
 bun run test              # vitest (rules, builder, components, i18n, CSRF…) — Vue warnings fail tests
@@ -176,16 +178,16 @@ If `check:platforms` reports a binary that doesn't exist yet, stay on the previo
 formo-vue/
 ├── src/                          ← the library
 │   ├── index.ts                  public API
-│   ├── plugin.ts                 createFormo()            (≈ config/formo.php)
+│   ├── plugin.ts                 createFormo()            (app-wide setup)
 │   ├── types.ts
 │   ├── core/
-│   │   ├── builder.ts            class Formo               (≈ classes/Formo/Core/Formo.php)
-│   │   ├── normalize.ts          definitions → node tree   (accepts PHP to_array() JSON)
-│   │   ├── drivers.ts            built-in drivers          (≈ classes/Formo/Core/Driver/*)
+│   │   ├── builder.ts            class Formo               (the builder; Formo.fromModel())
+│   │   ├── normalize.ts          definitions → node tree
+│   │   ├── drivers.ts            built-in drivers
 │   │   ├── conditions.ts         `ignore` / `exclude` conditions
 │   │   ├── locate.ts             path/alias → node (for rendering parts)
 │   │   ├── rules.ts              rule parsing/running on @vee-validate/rules
-│   │   ├── config.ts             defaults + messages       (≈ messages/validation.php)
+│   │   ├── config.ts             defaults + messages
 │   │   ├── theme.ts              defineTheme(), the Tailwind classes, shadcnClasses, class merging
 │   │   ├── controls.ts           defineControl(): any component as a control, with its contract
 │   │   └── values.ts, labels.ts, options.ts, utils.ts
@@ -194,6 +196,11 @@ formo-vue/
 │   │   ├── adapters.ts           vueI18n(), laravelI18n(), fromLaravelValidation(), fromVeeValidateLocale()
 │   │   └── locales/              en, fr, es, de, nl
 │   ├── nuxt-ui/index.ts          formo-vue/nuxt-ui: nuxtUiTheme(), toItems() — takes your Nuxt UI components
+│   ├── schema/                   formo-vue/schema — forms from models & schemas, plain TypeScript: no Vue, no DOM
+│   │   ├── ir.ts                 the Formo model (IR JSON v1): types, parseModel()   + formo-model.v1.schema.json
+│   │   ├── form.ts, policy.ts    formFromModel(): only / except / overrides / modes; type → driver, constraints → rules
+│   │   ├── values.ts             toFormValues(): a record → form values
+│   │   └── laravel.ts, json-schema.ts, openapi.ts, zod.ts   the adapters
 │   ├── http/
 │   │   ├── csrf.ts               CSRF tokens (meta / XSRF cookie / Sanctum priming, trusted origins)
 │   │   └── request.ts            Laravel-flavoured fetch (JSON/FormData, _method, 419 retry, 422 errors)
@@ -203,7 +210,7 @@ formo-vue/
 │   │   ├── useFormoField.ts      for custom field components
 │   │   └── useGroupSetup.ts      shared by the group / blueprint engines
 │   └── components/
-│       ├── FormoForm.vue         the <form>: submit, CSRF, v-model ($form->render())
+│       ├── FormoForm.vue         the <form>: submit + outcome events, CSRF, v-model
 │       ├── FormoField.vue        any field / subform / repeatable group, from a handle
 │       ├── parts.ts              FormoLabel, FormoInput, FormoHelp, FormoErrors, FormoChecklist
 │       ├── FormoErrorSummary.vue every error of the form
@@ -212,7 +219,7 @@ formo-vue/
 │       ├── FormoFieldEngine.ts   binds a field to VeeValidate, resolves its control and view, fills the view's slots
 │       ├── FormoGroupEngine.ts, FormoBlueprintEngine.ts   the same for subforms / repeatable groups
 │       ├── resolve.ts            view / control resolution (overrides → theme → built-in)
-│       ├── views/                the built-in views (≈ Formo's PHP views): form, group, blueprint,
+│       ├── views/                the built-in views: form, group, blueprint,
 │       │                         field, inline, fieldset, bare, label, help, error, checklist…
 │       └── controls/             FormoInputControl, FormoSelectControl, FormoChoicesControl (radios/checkboxes/set)…
 ├── playground/                   ← the Vite app served by `bun run dev`
@@ -230,6 +237,7 @@ formo-vue/
 ├── scripts/
 │   ├── build-registry.ts         registry/shadcn-vue/formo → registry/r/formo.json
 │   ├── check-deps.ts             every referenced package is declared
+│   ├── check-pure.ts, pure.ts    formo-vue/schema reaches no Vue / DOM / Node / package (+ tsconfig.schema.json)
 │   ├── check-native.ts           this machine's native binaries are there and load
 │   └── check-platforms.ts        the lockfile installs on every supported platform
 └── tests/
@@ -298,63 +306,52 @@ const form = useFormo({
 The other ways to define a form work too, and mix freely with it:
 
 ```ts
-// The builder — a port of the PHP API. Handy to change a form at runtime
+// The builder — handy to change a form at runtime
 const form = Formo.form({ alias: 'user' })
   .add('username', { required: true })
   .add('notes', 'textarea', 'My notes')                       // alias, driver, val
   .add('hobbies', 'checkboxes', ['run'], { opts: hobbies })   // alias, driver, val, options
-  .addGroup('hobby', 'select', hobbies, 'run')                 // add_group()
+  .addGroup('hobby', 'select', hobbies, 'run')                 // a field with options
   .add('address', { fields: { street: {}, zip: {} } })        // subform (or Formo.group().add(…))
 
 // Both at once: an object, then builder calls
 const form = Formo.form({ alias: 'user', fields: { username: {}, email: 'email' } })
 form.add('company', { order: ['after', 'username'] })
 
-// `fields` as a list (what the builder outputs — `form.toSchema()` — like PHP's to_array())
+// `fields` as a list (what the builder outputs: `form.toSchema()`)
 const form = { alias: 'user', fields: [{ alias: 'username' }, ['email', 'input|email'], 'nickname'] }
 
-// JSON from Formo (PHP): $form->to_array()
+// A definition your server sends as JSON
 const form = Formo.fromJSON(await (await fetch('/user/form')).json())
+
+// From a model or a schema: Laravel rules, JSON Schema, OpenAPI, Zod — see "Forms from models & schemas"
+const form = Formo.fromModel(fromLaravel(props.rules), { except: ['role'] })
 ```
 
 The builder stays **live**: calling `form.add(…)`, `.remove()`, `.order()`, `.find('x').set(…)` or `.addRule()` after the form is rendered updates it (see the *Subforms & form objects* example). Typed `form.fields` come from object definitions; fields added with `.add()` are reached with `form.field('company')` (or `form.fields.company`, typed loosely).
 
-### PHP → Vue API map
+### Builder API
 
-| Formo (PHP) | formo-vue |
+| Method | Does |
 | --- | --- |
-| `Formo::form(['alias' => 'x'])` | `Formo.form({ alias: 'x' })` |
-| `Formo::factory($array)` | `Formo.factory(def)` / `new Formo(def)` |
-| `->add($alias, $driver, $val, $opts)` | `.add(alias, driver, val, opts)` (same shorthands) |
-| `->add_group(...)` | `.addGroup(...)` |
-| `$form->username` / `$form->find('x')` | builder: `form.field('username')` / `form.find('x')` (also `'a.b'`, `['a','b']`) · controller: `form.fields.username` / `form.field('x')` |
-| `->set()` / `->get()` (dot syntax) | `.set()` / `.get()` (dot syntax) |
-| `->attr()`, `->add_class()`, `->remove_class()` | `.attr()`, `.addClass()`, `.removeClass()` |
-| `->add_rule()`, `->add_rules()`, `->add_rule_fields()`, `->add_rules_fields()` | `.addRule()`, `.addRules()`, `.addRuleFields()`, `.addRulesFields()` |
-| `->remove_rule()`, `->remove_rules_fields()` | `.removeRule()`, `.removeRulesFields()` |
-| `->callback()` / `'callbacks' => [...]` | `.callback()` / `.callbacks()` / `callbacks: {...}` |
-| `->order()`, `->subform()`, `->flatten()`, `->remove()` | `.order()`, `.subform()`, `.flatten()`, `.remove()` |
-| `->set_fields()`, `->set_var_fields()`, `->attr_fields()`, `->merge()` | `.setFields()`, `.setVarFields()`, `.attrFields()`, `.merge()` |
-| `->pad_blueprint($n \| $rows)` | `.padBlueprint(n \| rows)` |
-| `->is_required()` | `.isRequired()` |
-| `->to_array()` | `.toArray()` / `.toSchema()` / `JSON.stringify(form)` |
-| `$form->render()` | `<FormoForm :form="form" />` (or your own layout inside it) |
-| `$form->address->render()` | `<FormoField :field="form.fields.address" />` · `<FormoRender path="address" />` · `<component :is="form.render('address')" />` |
-| `$form->email->render()` | `<FormoField :field="form.fields.email" />` |
-| `$form->email->input()` / `open()…close()` | `<FormoInput :field="form.fields.email" />` |
-| `$form->email->label()` / `->error()` | `<FormoLabel :field="…" />` / `<FormoErrors :field="…" />` |
-| `->load($_POST)` | `controller.load(values)` or `v-model` |
-| `->validate()` | `await controller.validate()` |
-| `->val()` / `->val($v)` | `controller.val('path')` / `controller.val('path', v)` |
-| `->error('msg')` / `->errors()` | `controller.setError(path, msg)` / `controller.errors` |
-| `config/formo.php` | `createFormo({ config })`, `<FormoForm :config>`, or `config` on a group |
-| `template` (view file) / `template_dir` | `view` on a field (a view name or a component) / a theme's `views` — see [Themes & views](#themes--views) |
+| `Formo.form(def)` / `Formo.group(alias, def)` / `Formo.factory(def)` | A form, a subform, any field |
+| `Formo.fromModel(model, options)` / `Formo.fromJSON(json)` | From a model or schema (`formo-vue/schema`) / from a JSON definition |
+| `.add(alias, driver?, val?, def?)` · `.addGroup(alias, driver, opts, val?)` · `.remove(alias)` | Add (every shorthand above) / remove fields |
+| `.field('username')` · `.find('x')` (also `'a.b'`, `['a', 'b']`) · `.fields()` | Children, by alias or path |
+| `.set()` / `.get()` (dot syntax) · `.val()` · `.attr()` · `.addClass()` / `.removeClass()` · `.merge()` | Read / change a field |
+| `.addRule()` · `.addRules()` · `.addRuleFields()` · `.addRulesFields()` · `.removeRule()` · `.removeRulesFields()` · `.isRequired()` | Rules |
+| `.callback()` / `.callbacks()` | `pass` / `fail` callbacks |
+| `.order()` · `.subform()` · `.flatten()` · `.padBlueprint(n \| rows)` | Structure |
+| `.setFields()` · `.setVarFields()` · `.attrFields()` · `.mergeFields()` | Several fields at once |
+| `.toSchema()` / `JSON.stringify(form)` | The plain definition |
+
+At runtime, the controller (`useFormo()`) and its handles take over: `form.fields.email`, `form.val()`, `form.load()`, `form.validate()`, `form.setErrors()` — see [Rendering](#rendering-formoform-and-useformo).
 
 ## Field types (drivers)
 
 | Driver | Control | Value |
 | --- | --- | --- |
-| `input` (default) · `input\|email` · `email`… | `<input>` of any type. `email`, `url`, `tel`, `date`, `color`, `week`, `time`, `month`, `number`, `range` add validation rules automatically (Formo's `input_rules`), `number`/`range` honor `min`/`max`/`step` | string (`number`/`range`: number \| null) |
+| `input` (default) · `input\|email` · `email`… | `<input>` of any type. `email`, `url`, `tel`, `date`, `color`, `week`, `time`, `month`, `number`, `range` add validation rules automatically (`config.inputRules`), `number`/`range` honor `min`/`max`/`step` | string (`number`/`range`: number \| null) |
 | `textarea` | `<textarea>` | string |
 | `select` | `<select>`; `blank: true \| 'Choose…'`, optgroups, `attr.multiple` | option value (keeps its type) / array |
 | `datalist` | text input with suggestions | string |
@@ -383,7 +380,7 @@ Options (`opts`, alias `options`) accept everything Formo did, plus more:
 | Parameter | Purpose |
 | --- | --- |
 | `alias` | Key of the value and base of `name`/`id`. Spaces become `_` |
-| `driver` | See above. `'input\|email'` sets the type like Formo |
+| `driver` | See above. `'input\|email'` sets the input type |
 | `val` (or `value`) | Initial value |
 | `label` | Label text. Default: the alias, humanized (`first_name` → `First name`); `false` hides it |
 | `message` | Help text under the control |
@@ -397,21 +394,21 @@ Options (`opts`, alias `options`) accept everything Formo did, plus more:
 | `exclude` | Like `ignore`, and the values are dropped from the submit (Laravel `exclude_if`) |
 | `ignores`, `excludes` | On a checkbox (or any field): while truthy, these fields/subforms are ignored / excluded |
 | `callbacks` | `{ pass: [...], fail: [...] }` |
-| `filters` | Applied to submitted values: `'trim'`, `'lower'`, `'upper'`, `'int'`, `'float'`, `'null_if_empty'`, functions, `[fn, [':value']]` |
+| `filters` | Applied to submitted values: `'trim'`, `'lower'`, `'upper'`, `'int'`, `'float'`, `'null_if_empty'`, functions, `[fn, params]` (`fn(value, ...params)`) |
 | `order` | On add: index or `['before' \| 'after', alias]` |
 | `component`, `props`, `model` | The control — [Overriding components](#overriding-components) |
-| `view` | The view that lays the field (or group) out: a view name (`'inline'`, `'floating'`…), a component, or `false` for the bare control. PHP's `template` is read as `view` — [Themes & views](#themes--views) |
+| `view` | The view that lays the field (or group) out: a view name (`'inline'`, `'floating'`…), a component, or `false` for the bare control — [Themes & views](#themes--views) |
 | `classes` | Class overrides for this node only |
 | `fields` | Groups: children, keyed by alias (`{ street: {}, zip: 'input' }`) or as a list |
 | `components`, `config`, `theme` | Cascading overrides (a subform: everything inside; a field: itself). `theme` is a whole theme (`defineTheme()`) or `{ views, components, classes }` |
 | `blueprint`, `min`, `max`, `addLabel`, `removeLabel`, `rowLabel` | Repeatable groups |
-| anything else | Kept in `node.vars` (like Formo's `set('my_var', …)`), available to your components |
+| anything else | Kept in `node.vars` (`builder.set('my_var', …)`), available to your components |
 
 ## Rendering: `<FormoForm>` and `useFormo()`
 
 ```vue
 <FormoForm
-  :form="form"            <!-- builder, plain definition, PHP JSON, or a useFormo() controller -->
+  :form="form"            <!-- builder, plain definition (or its JSON), or a useFormo() controller -->
   v-model="values"        <!-- optional two-way values -->
   :theme="bootstrap"      <!-- a theme for this form (or { views, components, classes } overrides) -->
   :views="{ … }"          <!-- view overrides for this form -->
@@ -421,11 +418,12 @@ Options (`opts`, alias `options`) accept everything Formo did, plus more:
   :rules="{ … }"          <!-- extra rules -->
   :drivers="{ … }"        <!-- extra drivers -->
   :disabled="busy"        <!-- disables every control -->
-  native                  <!-- validate, then submit the <form> natively (see Migrating) -->
-  @submit="save"          <!-- (values, ctx) — may be async: submit buttons spin meanwhile -->
-  @invalid="onErrors"     <!-- (flatErrors) -->
-  @success="onSaved"      <!-- no @submit + attr.action: the form sends itself → (data, response) -->
-  @failure="onFailed"     <!-- …or the failed response (errors are already on the fields) -->
+  native                  <!-- validate, then submit the <form> natively (see CSRF & Laravel) -->
+  @submit="save"          <!-- (values, ctx) — may be async: submit buttons spin meanwhile. No @submit + attr.action: the form sends itself -->
+  @success="onSaved"      <!-- (data, outcome) it went through -->
+  @invalid="onErrors"     <!-- (flatErrors, outcome) the browser's validation stopped it: nothing was sent -->
+  @rejected="onRefused"   <!-- (outcome) sent, but refused: outcome.reason = validation (422) / session (419) / server / handler / error -->
+  @settled="onDone"       <!-- (outcome) after every submit: outcome.result = success / invalid / rejected -->
 >
   <template #before="{ form }"> <FormoErrorSummary /> </template>  <!-- above the fields -->
   <!-- default slot ({ form, fields, values… }): your own layout instead of the automatic one -->
@@ -433,6 +431,51 @@ Options (`opts`, alias `options`) accept everything Formo did, plus more:
   <template #actions="{ submitting, valid, reset }"> … </template>
 </FormoForm>
 ```
+
+### Submit outcomes: `@success`, `@invalid`, `@rejected`, `@settled`
+
+Every submit ends one of three ways, and fires the matching event, then `@settled`:
+
+| `outcome.result` | Event | Meaning |
+| --- | --- | --- |
+| `success` | `@success(data, outcome)` | Valid, and accepted. `data` is the response's data, or what `@submit` returned |
+| `invalid` | `@invalid(errors, outcome)` | The browser's validation stopped it: nothing was sent, the errors are on screen |
+| `rejected` | `@rejected(outcome)` | Sent, but refused. `outcome.reason`: `validation` (a 422, or errors set by the handler), `session` (419), `server` (other 4xx / 5xx), `handler` (returned `false`, or `reject()` without errors), `error` (it threw; a form-level message is shown) |
+
+It's not a single "failure" event because the two cases need different handling. After `invalid`, nothing left the browser. After `rejected`, it did, and the server (or your handler) said no. Use `@settled` to react to any submit.
+
+**How the outcome is worked out** — from what happened during the submit, not from what `@submit` returned (first match wins):
+1. `@submit` threw → `rejected` (`error`).
+2. It called `ctx.reject(errors?)` → `rejected`.
+3. A request made meanwhile didn't succeed → `rejected` (`validation` / `session` / `server`). That's `ctx.request()`, `form.request()`, or a response `@submit` returned.
+4. Errors were set meanwhile (`ctx.setErrors`) → `rejected` (`validation`).
+5. It returned `false` → `rejected` (`handler`).
+6. Otherwise → `success`.
+
+So `@submit` can return nothing and just call `request()`. Callback-style APIs return a promise that settles when they do. The submit button spins until then, and a second click reuses the submit in flight instead of posting twice:
+
+```ts
+// Inertia: the outcome waits for the router
+const save = (values, { setErrors }) =>
+  new Promise((resolve) =>
+    router.put(`/users/${id}`, values, {
+      onSuccess: () => resolve(true),
+      onError: (errors) => { setErrors(errors); resolve(false) },  // → @rejected, reason 'validation'
+    }),
+  )
+```
+
+`@failure` still works, as a deprecated name for `@rejected`. Without `<FormoForm>`, pass the same handlers to `useFormo(definition, { onSuccess, onInvalid, onRejected, onSettled })`. `await form.submit()` resolves to whether it succeeded, and `form.outcome` is the last outcome.
+
+### Values from outside
+
+`initialValues` can be a ref or a getter: `useFormo(definition, { initialValues: () => props.user })`. A reactive definition works the same way: `useFormo(() => Formo.fromModel(model, { values: props.user }))`. When those values change (a reloaded record, a websocket push):
+
+- **Fields not changed in the form follow**, read-only ones included: an uneditable field always shows the current value. Repeatable rows and checkbox lists follow as a whole.
+- **Fields the user changed keep the user's value.**
+- **The new values become the baseline** for `dirty` and `reset()`, and a field showing an error is validated again.
+
+The changes reach every control, whether built-in, Nuxt UI, shadcn-vue or `defineControl()`. So do `form.val()`, `form.load()` and `v-model`. A definition's structure is live too: `editable`, `render`, labels and rules can change while the form is shown, with values kept.
 
 For programmatic access, create the controller yourself: the runtime half of a Formo object.
 
@@ -445,7 +488,7 @@ form.values                   // reactive values
 form.val('address.zip')       // get · form.val('address.zip', '12345') set
 form.load({ … })              // merge values (Formo load())
 await form.validate()         // fields, then group rules, then callbacks → boolean
-await form.submit()
+await form.submit()           // → true if it *succeeded* (valid, and not rejected) · form.outcome: how it ended
 form.reset()
 form.errors                   // Formo errors() format: { email: '…', address: { zip: '…', ':self': '…' } }
 form.flatErrors               // { email: '…', 'address.zip': '…', '': 'form error' }
@@ -461,7 +504,7 @@ form.vee                      // the underlying VeeValidate form context
 
 ## Rendering parts anywhere: `<FormoField>`
 
-Like Formo's `$object->render()`, every level renders on its own: the form, a subform, a field, just its input. `form.fields` mirrors the definition, one **handle** per field, and `<FormoField>` renders any of them:
+Every level renders on its own: the form, a subform, a field, just its input. `form.fields` mirrors the definition, one **handle** per field, and `<FormoField>` renders any of them:
 
 ```vue
 <FormoForm :form="form">
@@ -502,12 +545,12 @@ Like Formo's `$object->render()`, every level renders on its own: the form, a su
 
   ```vue
   <FormoField :field="form.fields.newsletter" />      <!-- e.g. in a sidebar component -->
-  <component :is="form.render('email')" />            <!-- object style: <?= $form->email->render() ?> -->
+  <component :is="form.render('email')" />            <!-- a component for any part, by path -->
   <button @click="form.submit(save)">Save</button>    <!-- no <form> element needed -->
   ```
 
   Those parts validate and submit with the rest of the form, whether or not a `<FormoForm>` is also on the page. Form-level rules and callbacks still run. `form.submit(handler)` validates everything and calls `handler(values, ctx)` when it passes.
-- **Path strings** (server-driven schemas, fields added at runtime): `<FormoRender path="address.zip" />` renders the same way, with the same slots, and `part="input" | "label" | "errors" | "help" | "checklist"` for a single piece. Its paths are relative to the subform or row you're in first (`path="street"` inside `address`'s layout), then from the form, then by alias like Formo's `find()`.
+- **Path strings** (server-driven schemas, fields added at runtime): `<FormoRender path="address.zip" />` renders the same way, with the same slots, and `part="input" | "label" | "errors" | "help" | "checklist"` for a single piece. Its paths are relative to the subform or row you're in first (`path="street"` inside `address`'s layout), then from the form, then by alias (searched recursively).
 
 ## Your own markup: the parts
 
@@ -602,8 +645,8 @@ Row handles are typed from the definition (`rows[0].fields.school`), keyed stabl
 Rules run on VeeValidate (one validator per field built from `@vee-validate/rules`). All notations can be mixed:
 
 ```ts
-rules: [['not_empty'], ['min_length', [':value', 3]], ['regex', [':value', '/^[a-z]+$/i']]]  // Kohana / Formo
-rules: 'required|min:3|confirmed:@password'          // VeeValidate string
+rules: 'required|min:3|confirmed:@password'          // a string (Laravel-style)
+rules: [['required'], ['between', [1, 10]], ['regex', [/^[a-z]+$/i]]]   // tuples: [name, params]
 rules: { required: true, between: [1, 10] }          // VeeValidate object
 rules: [(value, params, ctx) => value !== 'admin' || 'Reserved name']   // function (sync or async)
 rules: z.string().email()                            // zod / valibot / arktype (Standard Schema)
@@ -612,22 +655,22 @@ rules: [{ rule: 'min', params: [8], message: 'Too short!' }]
 required: true                                       // shortcut
 ```
 
-**Built-in rules** (VeeValidate names, Kohana aliases in parentheses): `required` (`not_empty`), `email`, `url`, `min` (`min_length`), `max` (`max_length`), `length` (`exact_length`), `numeric` (`digit`), `integer`, `decimal`, `digits`, `between` (`range`), `min_value`, `max_value`, `regex` (PHP `/…/flags` strings work), `alpha`, `alpha_num` (`alpha_numeric`), `alpha_dash`, `alpha_spaces`, `is` (`equals`), `is_not`, `one_of` (`in_array`), `not_one_of`, `confirmed`/`matches` (both the Kohana `[':validation', 'a', 'b']` signature and `@field` refs), `date`, `phone`, `color`, `ip`, `min_items`, `max_items`, `ext`, `mimes`, `image`, `size`, `dimensions`, `upload_size` (`Upload::size`, `1M`), `html5_range` (`Formo::range`), Laravel's password helpers `mixed_case`, `letters`, `numbers`, `symbols` (`Password::mixedCase()`…), and Laravel's conditional rules `required_if`, `required_unless`, `required_with`, `required_with_all`, `required_without`, `required_without_all`, `exclude_if`, `exclude_unless` (see [Optional subforms](#optional-subforms--conditional-rules)). `Valid::…` prefixes are stripped.
+**Built-in rules** (VeeValidate / Laravel names): `required`, `email`, `url`, `min`, `max`, `length`, `numeric` (digits only), `integer`, `decimal` (Laravel's `numeric`), `digits`, `between`, `min_value`, `max_value`, `regex` (a RegExp, or a delimited string like Laravel's `/…/i`), `alpha`, `alpha_num`, `alpha_dash`, `alpha_spaces`, `is`, `is_not`, `one_of`, `not_one_of`, `confirmed` / `matches` (`@field` refs), `date`, `phone`, `color`, `ip`, `min_items`, `max_items`, `ext`, `mimes`, `image`, `size` (KB), `dimensions`, `upload_size` (`1M`, `500K`), `html5_range` (the input's `min` / `max` / `step`), Laravel's password helpers `mixed_case`, `letters`, `numbers`, `symbols` (`Password::mixedCase()`…), Laravel's `accepted` and numeric comparisons `gt`, `gte`, `lt`, `lte` (against a number or a field: `gte:@start`), and Laravel's conditional rules `required_if`, `required_unless`, `required_with`, `required_with_all`, `required_without`, `required_without_all`, `exclude_if`, `exclude_unless` (see [Optional subforms](#optional-subforms--conditional-rules)).
 
-**Params**: Kohana pseudo-params work: `:value`, `:field`/`:alias`, `:validation`/`:form_val`/`:values` (the group's values), `:form` (controller). `@other_field` references another field's value (sibling first, then from the form root). In messages it becomes that field's label.
+**Params**: `@other_field` references another field's value (sibling first, then from the form root). In messages it becomes that field's label. Function rules get `(value, params, ctx)` — `ctx` has the form's and the group's values, the field, its label and the controller.
 
 **Group / form-level rules**: put `rules` on a group or the form. They receive the group's values and run only once all its fields pass (Formo semantics). The error renders at the top of the group (`errors[':self']`).
 
-**Several rules on a field** run in order. By default the first failure stops the rest, as in Kohana. `errorDisplay: 'all'` runs them all and lists every failure, and `errorDisplay: 'checklist'` shows each one as a live requirement (see the next section). `form.allErrors` has every message per field.
+**Several rules on a field** run in order. By default the first failure stops the rest. `errorDisplay: 'all'` runs them all and lists every failure, and `errorDisplay: 'checklist'` shows each one as a live requirement (see the next section). `form.allErrors` has every message per field.
 
-**Messages** (like Formo's message files), first match wins:
+**Messages**, first match wins:
 
 1. the rule's own `message`
 2. the field's `errorMessages[rule]`
 3. `config.messages['path.rule']`, `['parent.alias.rule']`, `['alias.rule']`, `['alias.default']`
 4. `config.messages[rule]`, then `default`
 
-Placeholders: `:field` (label), `:value`, `:param1…`, `:params`, `:other` (confirmed/matches/required_if), Laravel's names (`:attribute`, `:min`, `:max`, `:size`, `:digits`, `:values`), or the `{field}` style. Unlike Kohana, `:param1` is the first real param, not the value.
+Placeholders: `:field` (label), `:value`, `:param1…`, `:params`, `:other` (confirmed/matches/required_if), Laravel's names (`:attribute`, `:min`, `:max`, `:size`, `:digits`, `:values`), or the `{field}` style. `:param1` is the rule's first param.
 
 A custom rule with a checklist `label` and no message uses its label as the message. Translations: see [i18n](#i18n).
 
@@ -640,7 +683,7 @@ A custom rule with a checklist `label` and no message uses its label as the mess
 | `lazy` | On blur (and on change while the field shows an error) |
 | `submit` | Only on submit (errors still clear as you fix them) |
 
-**Callbacks** run after validation, deepest first, like Formo's:
+**Callbacks** run after validation, deepest first:
 
 ```ts
 Formo.form({
@@ -653,7 +696,7 @@ Formo.form({
 
 A `pass` callback can veto by returning `false` or a message. Callbacks get `{ node, path, value, values, form, setError }`.
 
-**Server errors**: `@submit="(values, { setErrors }) => …"`, or `form.setErrors(...)`, accepts flat paths or Formo's nested `errors()` format. `':self'` is the form itself.
+**Server errors**: `@submit="(values, { setErrors }) => …"`, or `form.setErrors(...)`, accepts flat paths or Formo's nested `errors()` format. `':self'` is the form itself. Laravel / Inertia keys work as they are (`phones.0.number` → the first phone row). Errors a server rendered into the page (a failed post with JavaScript off, Inertia's `errors` prop) go in `useFormo(definition, { errors })`; they're applied once the fields are mounted.
 
 ## Error display & checklists
 
@@ -661,7 +704,7 @@ Each field shows its validation state in one of three ways (`errorDisplay` on th
 
 | `errorDisplay` | Shows |
 | --- | --- |
-| `'first'` (default) | The first failing rule's message, like Formo/Kohana |
+| `'first'` (default) | The first failing rule's message |
 | `'all'` | Every failing rule's message, as a list |
 | `'checklist'` (or `checklist: true`) | **Every** rule as a live requirement: a grey box with ✗ before each one until the value meets it, then a green ✓. Re-evaluated on every keystroke; unmet items turn red once the field failed validation |
 
@@ -683,7 +726,7 @@ Each field shows its validation state in one of three ways (`errorDisplay` on th
 
 ## Optional subforms & conditional rules
 
-In Formo (PHP), a subform with `ignore` wasn't validated at all. formo-vue makes this reactive: the form's own values decide what's optional. An **ignored** field or subform is fully optional:
+The form's own values decide what's optional. An **ignored** field or subform is fully optional:
 
 - none of its rules run
 - group rules and callbacks inside it are skipped
@@ -757,7 +800,7 @@ createFormo({ config: { locales: {
 } } })
 ```
 
-**Texts** are the strings you write in definitions: explicit labels, `message`s, option labels, placeholders/titles, button labels, `blank` options, `addLabel`s. Like Kohana's `__('Email')`, the text itself is the key. Rules that return a string message are translated the same way.
+**Texts** are the strings you write in definitions: explicit labels, `message`s, option labels, placeholders/titles, button labels, `blank` options, `addLabel`s. Like Laravel's `__('Email')`, the text itself is the key. Rules that return a string message are translated the same way.
 
 **vue-i18n:**
 
@@ -829,7 +872,7 @@ createFormo({ config: { csrf: 'sanctum' } })  // or per form: <FormoForm :config
 
 ```ts
 Formo.form({ alias: 'profile', attr: { action: '/api/profile', method: 'put' } })
-// <FormoForm :form="form" @success="(data) => …" @failure="(response) => …" />
+// <FormoForm :form="form" @success="(data) => …" @rejected="(outcome) => …" />
 ```
 
 Or call `request()` yourself from `@submit`, with the same handling:
@@ -870,23 +913,54 @@ axios.interceptors.request.use(async (cfg) => {
 })
 ```
 
+## Forms from models & schemas
+
+`formo-vue/schema` builds a form from a model — every field or just some, with overrides — types, labels and validation included:
+
+```ts
+import { Formo, useFormo } from 'formo-vue'
+import { fromLaravel, fromJsonSchema, fromOpenApi, fromZod, parseModel } from 'formo-vue/schema'
+
+// a FormRequest's rules(), attributes(), messages() — e.g. an Inertia prop
+const form = useFormo(
+  Formo.fromModel(fromLaravel(props.rules), {
+    except: ['role'],                                      // or only: ['name', 'email', 'address.zip']
+    fields: { bio: { attr: { rows: 6 } }, terms: { driver: 'checkbox', required: true } },  // overrides & additions
+    mode: 'update',                                        // read-only fields shown, passwords optional
+    values: props.user,                                    // Formo's orm('load'): dates, relations… converted
+  }),
+)
+// the others: fromJsonSchema(schema) · fromOpenApi(doc, { operation: 'POST /users' })
+//             fromZod(Schema, { toJSONSchema: z.toJSONSchema }) · parseModel(json from your backend)
+```
+
+- Every source becomes a **Formo model**, a public, versioned IR (`{ "version": 1, "fields": [...] }`, contract in `src/schema/formo-model.v1.schema.json`). A backend can also send one directly, as an Inertia prop or from an endpoint.
+- `formFromModel()` returns a plain definition; `Formo.fromModel()` returns a builder, so you can keep going (`.add()`, `.order()`).
+- **Derived rules by default**, so Formo's messages, checklists, live locale switching and Laravel lang files keep working:
+  - Laravel's typed `min` / `max` / `size`, `numeric`, `confirmed` (adds `password_confirmation`) and `phones.*.number` rows are read like Laravel reads them.
+  - Zod's `.refine()` / `.superRefine()` still run through Zod, and object-level issues land on the field their `path` names. Opt into `validation: 'schema'` to make Zod the only validator.
+  - Server-only rules (`unique`, `exists`) stay on the server.
+- Bookkeeping fields (`id`, `created_at`…) and guarded fields stay out unless asked for. Anything unsupported is reported, never silently dropped.
+
+Full guide: [docs/schema.md](docs/schema.md).
+
 ## Themes & views
 
-In Formo (PHP), forms are laid out by **view files** — `form_template.php`, `group_template.php`, `field_template.php`… — and pointing Formo at another template directory changes how every form looks. formo-vue works the same way: a **theme** is a set of **views** (Vue components laying out the form, a subform, a field, a label…), plus the **controls** and the **classes** they use.
+A **theme** is a set of **views** (Vue components laying out the form, a subform, a field, a label…), plus the **controls** and the **classes** they use. Switching themes changes how every form looks.
 
-| View | Lays out | Formo (PHP) | Slots it fills |
-| --- | --- | --- | --- |
-| `form` | inside `<form>` (which keeps submit, CSRF, `disabled`) | `form_template.php` | `before`, default (the fields), `actions` |
-| `group` | a subform | `group_template.php` | default (its fields) |
-| `blueprint`, `blueprintRow` | repeatable groups, one row | — | `row` (`{ row }`, once per row) / default (the row's fields) |
-| `field` | label above the control (default) | `field_template.php` | `label`, `input`, `help`, `checklist`, `errors` |
-| `inline` | checkbox, then its label | `checkbox_template.php` | same |
-| `fieldset` | radios / checkboxes under a `<legend>` | — | same |
-| `bare` | no label (buttons) | — | same, without `label` |
-| `label`, `help`, `errors`, `checklist`, `uneditable` | a field's parts — also what `<FormoLabel>`, `<FormoErrors>`… render | `$field->label()`, `error()`… | — |
-| `errorSummary` | `<FormoErrorSummary>` | `$form->errors()` | — |
+| View | Lays out | Slots it fills |
+| --- | --- | --- |
+| `form` | inside `<form>` (which keeps submit, CSRF, `disabled`) | `before`, default (the fields), `actions` |
+| `group` | a subform | default (its fields) |
+| `blueprint`, `blueprintRow` | repeatable groups, one row | `row` (`{ row }`, once per row) / default (the row's fields) |
+| `field` | label above the control (default) | `label`, `input`, `help`, `checklist`, `errors` |
+| `inline` | checkbox, then its label | same |
+| `fieldset` | radios / checkboxes under a `<legend>` | same |
+| `bare` | no label (buttons) | same, without `label` |
+| `label`, `help`, `errors`, `checklist`, `uneditable` | a field's parts — also what `<FormoLabel>`, `<FormoErrors>`… render | — |
+| `errorSummary` | `<FormoErrorSummary>` | — |
 
-Every view gets a `formo` prop — the state of what it renders (a field's value, error, label, ids, classes…; a group's label, error…; a repeatable group's rows, `add()`…) — and places Formo's parts through **slots**. A view only does layout; binding, validation, ids and aria stay in Formo. Here's a complete `field` view, the counterpart of `field_template.php`:
+Every view gets a `formo` prop — the state of what it renders (a field's value, error, label, ids, classes…; a group's label, error…; a repeatable group's rows, `add()`…) — and places Formo's parts through **slots**. A view only does layout; binding, validation, ids and aria stay in Formo. Here's a complete `field` view:
 
 ```vue
 <!-- BsField.vue -->
@@ -935,7 +1009,7 @@ app.use(createFormo({ theme: bootstrap }))
 
 A whole theme can also be set on one subform (`{ fields: {…}, theme: bootstrap }`, cascading inside) or one field (`{ theme: bootstrap }`). Its parts — `<FormoLabel>`, `<FormoErrors>`… in your own markup — follow it too.
 
-A field picks a view with **`view`**: one of the theme's (`view: 'inline'`, or a name the theme adds: `view: 'floating'`), a component (`view: CardField`), or `false` for the bare control. PHP's `template` is read as the view name, so `to_array()` JSON keeps working. Groups take `view` too (`view: MyFieldset`). Drivers say which view their fields use (`checkbox` → `inline`, `radios` → `fieldset`, buttons → `bare`).
+A field picks a view with **`view`**: one of the theme's (`view: 'inline'`, or a name the theme adds: `view: 'floating'`), a component (`view: CardField`), or `false` for the bare control. Groups take `view` too (`view: MyFieldset`). Drivers say which view their fields use (`checkbox` → `inline`, `radios` → `fieldset`, buttons → `bare`).
 
 ### Overrides
 
@@ -1095,21 +1169,14 @@ createFormo({
 
 ## Subforms, namespaces and repeatable groups
 
-- A subform (an entry with `fields`, or a form/group added to a form) nests its values (`{ address: { street } }`) and its names (`user[address][street]`), exactly like Formo's `namespaces`. Set `config: { namespaces: false }` on a group to keep it visual only.
+- A subform (an entry with `fields`, or a form/group added to a form) nests its values (`{ address: { street } }`) and its names (`user[address][street]`). Set `config: { namespaces: false }` on a group to keep it visual only.
+- Names start with the form alias (`user[email]`). `config: { namePrefix: false }` gives bare names (`email`, `address[street]`) — what a FormRequest validates — and `namePrefix: 'account'` another root. Forms from models use their model's keys by default.
 - **Blueprints** (repeatable rows): `phones: { blueprint: true, min: 1, max: 5, addLabel: 'Add phone', val: rows, fields: { number: 'tel' } }`, or `Formo.group('phones', { min: 1 }).add('number').padBlueprint(rows)`. The value is an array of row objects; `rules` on the group validate the whole list. Rows have handles: `form.fields.phones.rows[0].fields.number`.
 
-## Migrating from PHP gradually
+## Good to know
 
-- **Keep your PHP form definitions**: `echo json_encode($form->to_array())` and render it with `<FormoForm :form="Formo.fromJSON(json)">`. Kohana rules, `_NOTSET` labels, `input|type` drivers and `template` (as the view name) are understood.
-- **Keep your PHP controllers**: `<FormoForm native>` validates client-side, then submits the `<form>` natively to its `action`, with the CSRF `_token` and `_method` fields. Names are namespaced like Formo's (`user[address][street]`), checkboxes post `name[]`, file fields make the form `multipart/form-data`, and custom components get hidden inputs mirroring their value. `$form->load($_POST)->validate()` keeps working server-side.
-- Port message files to `config.messages` (or per-locale `locales.xx.validation`) and label files to `config.labels` / `locales.xx.labels`. Laravel lang files can be used directly (see [i18n](#i18n)).
-
-## Differences from Formo (PHP)
-
-- No ORM driver / `Formo_ORM` trait; load model data with `val`/`v-model`/`form.load()`.
-- No `sent()`: in the browser, submit is explicit.
-- Message params: `:param1` is the first real param (Kohana's `:param1` was the value).
-- `numeric` follows VeeValidate (digits only); use `decimal` for Kohana's `numeric`.
-- Default ids are prefixed with the form alias (`user-email`) so several forms can share a page; an explicit `attr.id` still wins.
-- Labels are humanized by default (`humanizeLabels: false` for raw aliases).
-- Fields with `render: false` keep their values (like Formo) but aren't validated.
+- `numeric` means digits only (VeeValidate); `decimal` is any number — Laravel's `numeric` (`fromLaravel` maps it for you).
+- Default ids start with the form alias (`user-email`), so several forms can share a page; an explicit `attr.id` still wins.
+- Labels are humanized by default (`first_name` → `First name`; `humanizeLabels: false` for raw aliases).
+- Fields with `render: false` keep their values but aren't validated.
+- In the browser, submitting is explicit: `<FormoForm @submit>`, `form.submit()`, or a self-submitting form with `attr.action`.

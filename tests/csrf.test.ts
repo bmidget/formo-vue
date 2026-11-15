@@ -208,7 +208,7 @@ describe('forms + requests', () => {
     expect(wrapper.text()).toContain('The phone number is invalid.')
   })
 
-  it('a form with attr.action and no @submit sends itself; @success / @failure get the outcome', async () => {
+  it('a form with attr.action and no @submit sends itself; @success / @rejected get the outcome', async () => {
     setMeta('T')
     const server = fakeLaravel({ sessionToken: () => 'T' })
     const onSuccess = vi.fn()
@@ -222,23 +222,28 @@ describe('forms + requests', () => {
     await wrapper.get('form').trigger('submit')
     await settle()
     expect(server.calls[0].init.method).toBe('PUT')
-    expect(onSuccess).toHaveBeenCalledWith({ saved: { name: 'Ann' } }, expect.objectContaining({ status: 200 }))
+    expect(onSuccess).toHaveBeenCalledWith(
+      { saved: { name: 'Ann' } },
+      expect.objectContaining({ result: 'success', response: expect.objectContaining({ status: 200 }) }),
+    )
   })
 
   it('a 419 that survives the retry shows a "session expired" form error', async () => {
     const server = fakeLaravel({ sessionToken: () => 'never-matches' })
     setMeta('T')
-    const onFailure = vi.fn()
+    const onRejected = vi.fn()
     const wrapper = mount(FormoForm, {
       props: {
         form: Formo.form({ attr: { action: '/api/x' } }).add('name', 'input', 'Ann'),
         config: { request: { fetch: server.fetch } },
-        onFailure,
+        onRejected,
       },
     })
     await wrapper.get('form').trigger('submit')
     await settle()
-    expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({ status: 419 }))
+    expect(onRejected).toHaveBeenCalledWith(
+      expect.objectContaining({ result: 'rejected', reason: 'session', response: expect.objectContaining({ status: 419 }) }),
+    )
     expect(wrapper.get('form [role="alert"]').text()).toBe('Your session has expired. Please refresh the page and try again.')
   })
 

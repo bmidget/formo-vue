@@ -16,7 +16,7 @@ import FormoUneditableView from './FormoUneditableView.vue'
 import FormoErrorSummaryView from './FormoErrorSummaryView.vue'
 
 /**
- * The built-in views — the Vue versions of Formo's PHP view files. A theme
+ * The built-in views. A theme
  * that doesn't provide a view falls back to these.
  */
 export const builtinViews: FormoViews = {

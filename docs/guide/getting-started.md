@@ -12,7 +12,7 @@ aside: false
 
 Instead, Formo makes working with **forms, validation, state, and styling** effortless:
 - **Forms as objects**: Define fields, subforms, repeatable groups, and rules in one plain object (or with the chainable `Formo` builder).
-- **Validation & state handled**: Built on VeeValidate with Kohana rule arrays, VeeValidate strings, async functions, Zod schemas, live checklists, i18n, and Laravel CSRF support.
+- **Validation & state handled**: Built on VeeValidate with rule strings (Laravel-style), rule objects, async functions, Zod schemas, live checklists, i18n, and Laravel CSRF support.
 - **Your UI, your styling**: Render out of the box with the built-in Tailwind theme, plug directly into **Nuxt UI** (`formo-vue/nuxt-ui`) or **shadcn-vue** (via the registry item), or drop in your own components and markup anywhere.
 
 ## Installation

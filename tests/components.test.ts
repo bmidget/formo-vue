@@ -31,7 +31,7 @@ describe('<FormoForm>', () => {
   it('validates, shows errors, and submits filtered values', async () => {
     const onSubmit = vi.fn()
     const form = Formo.form({ alias: 'signup' })
-      .add('username', { rules: [['not_empty'], ['min_length', [':value', 3]]], filters: ['trim'] })
+      .add('username', { rules: 'required|min:3', filters: ['trim'] })
       .add('email', 'input|email', { required: true })
     const wrapper = mount(FormoForm, { props: { form, onSubmit } })
 

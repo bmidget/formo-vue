@@ -78,7 +78,7 @@ export interface FormoFieldState {
   label: string
   /** Help text (the field's `message`), translated */
   message: string | undefined
-  /** Text for buttons (label, Formo `html`, value or alias) */
+  /** Text for buttons (label, value or alias) */
   text: string
   /** Normalized options for select/radios/checkboxes */
   options: FormoOptionItem[]

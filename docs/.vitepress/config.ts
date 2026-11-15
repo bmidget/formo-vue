@@ -69,7 +69,8 @@ export default defineConfig({
           { text: 'Layouts & Parts', link: '/guide/layouts' },
           { text: 'Validation & Checklists', link: '/guide/validation' },
           { text: 'Theming & Customizing', link: '/guide/customizing' },
-          { text: 'Advanced & Migration', link: '/guide/advanced' },
+          { text: 'Advanced', link: '/guide/advanced' },
+          { text: 'Forms from Models & Schemas', link: '/schema' },
         ],
       },
       {

@@ -2,7 +2,7 @@
 /**
  * (Playground only) What a native submit of each <form> in the preview would
  * send — namespaced like Formo (`user[address][street]`), so an existing
- * Kohana/Laravel controller keeps working. Read straight from the DOM.
+ * Laravel controller can read it. Read straight from the DOM.
  */
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
@@ -27,8 +27,9 @@ onBeforeUnmount(() => clearInterval(timer))
 <template>
   <div class="space-y-6">
     <p class="text-sm text-slate-600">
-      What a native submit would POST — names are namespaced like Formo's, so an existing Kohana or Laravel
-      controller (<code class="rounded bg-slate-100 px-1 text-xs">$form->load($_POST)</code> / <code class="rounded bg-slate-100 px-1 text-xs">$request->input('user.address.street')</code>) keeps working.
+      What a native submit would POST — names are namespaced (<code class="rounded bg-slate-100 px-1 text-xs">user[address][street]</code>),
+      so a Laravel controller reads them as usual (<code class="rounded bg-slate-100 px-1 text-xs">$request->input('user.address.street')</code>).
+      Forms from models use the model's own keys (<code class="rounded bg-slate-100 px-1 text-xs">email</code>, <code class="rounded bg-slate-100 px-1 text-xs">address[street]</code>).
     </p>
     <div
       v-for="form in forms"

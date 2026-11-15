@@ -18,8 +18,8 @@ import FormoChildren from './FormoChildren.vue'
 import FormoBlueprintRow from './FormoBlueprintRow'
 
 /**
- * The engine of a repeatable group — Formo's blueprints (`blueprint => TRUE`,
- * `pad_blueprint()`) (internal).
+ * The engine of a repeatable group — blueprints (`blueprint: true`,
+ * `padBlueprint()`) (internal).
  *
  * The group's `fields` are the template for one row; the value is an array of
  * row objects (`phones[0].number`). `val` pre-fills rows, `min` pads empty rows

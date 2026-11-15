@@ -16,6 +16,10 @@
       "types": "./dist/types/nuxt-ui/index.d.ts",
       "import": "./dist/nuxt-ui.js"
     },
+    "./schema": {
+      "types": "./dist/types/schema/index.d.ts",
+      "import": "./dist/schema.js"
+    },
     "./src/*": "./src/*"
   },
   "files": [
@@ -40,9 +44,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:deps": "bun scripts/check-deps.ts",
-    "check": "bun run check:native && bun run check:platforms && bun run check:deps && bun run check:registry && bun run typecheck && bun run test",
+    "check": "bun run check:native && bun run check:platforms && bun run check:deps && bun run check:pure && bun run check:registry && bun run typecheck && bun run test",
     "check:native": "bun scripts/check-native.ts",
     "check:platforms": "bun scripts/check-platforms.ts",
+    "check:pure": "bun scripts/check-pure.ts",
     "build:registry": "bun scripts/build-registry.ts",
     "check:registry": "bun scripts/build-registry.ts --check"
   },

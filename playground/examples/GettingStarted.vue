@@ -1,14 +1,12 @@
 <script setup lang="ts">
 /**
  * A form is one object: every field keyed by its alias, subforms nested under
- * `fields`. Rules keep Formo's notations (Kohana arrays) or VeeValidate's.
+ * `fields`. Rules are strings (`'required|min:3'`, Laravel-style), objects,
+ * tuples or functions.
  *
- *   $form = Formo::form(['alias' => 'signup'])
- *     ->add('username', ['rules' => [['not_empty'], ['min_length', [':value', 3]]]])
- *     ->add('email', 'input|email', ['required' => TRUE]) …
- *
- * The PHP-style builder is there too — `Formo.form('signup').add('username', {…})`
- * — and handy to change a form at runtime (see "Subforms & form objects").
+ * The builder is there too — `Formo.form('signup').add('username', {…})` — and
+ * handy to change a form at runtime (see "Subforms & form objects"). Forms can
+ * also come from a model or a schema (see "Forms from models").
  *
  * `useFormo()` gives you the live form object: values, errors, validate(), load()…
  */
@@ -19,19 +17,19 @@ const form = useFormo({
   alias: 'signup',
   fields: {
     username: {
-      // Kohana rule arrays work as-is
-      rules: [['not_empty'], ['min_length', [':value', 3]], ['alpha_dash']],
+      // Rule strings, like Laravel's
+      rules: 'required|min:3|alpha_dash',
       message: 'Letters, numbers, dashes and underscores.',
       attr: { autocomplete: 'username' },
     },
-    // `driver: 'email'` is `input|email`, just like Formo
+    // `driver: 'email'` is `input|email`
     email: { driver: 'email', required: true, attr: { placeholder: 'you@example.com' } },
-    // …and so do VeeValidate rule strings
-    password: { driver: 'password', rules: 'required|min:8' },
+    // …or rule objects
+    password: { driver: 'password', rules: { required: true, min: 8 } },
     password_confirm: {
       driver: 'password',
       label: 'Confirm password',
-      rules: [['matches', [':validation', 'password_confirm', 'password']]],
+      rules: 'required|matches:@password',
     },
     // A string is just the driver
     website: 'url',

@@ -33,6 +33,58 @@
   }
 }
 
+/* "Full width" (WideToggle.vue): no "On this page" column, no max widths — demos get the whole screen */
+html.formo-wide {
+  --vp-layout-max-width: 100vw;
+}
+
+html.formo-wide .VPDoc .aside {
+  display: none !important;
+}
+
+@media (min-width: 960px) {
+  html.formo-wide .VPDoc .container,
+  html.formo-wide .VPDoc .content,
+  html.formo-wide .VPDoc .content-container {
+    max-width: none !important;
+  }
+}
+
+.formo-wide-aside {
+  margin-bottom: 12px;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vp-c-text-2);
+  border: 1px solid var(--vp-c-divider);
+}
+
+.formo-wide-aside:hover {
+  color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+
+.formo-wide-floating {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 30;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg-elv);
+  border: 1px solid var(--vp-c-divider);
+  box-shadow: var(--vp-shadow-3);
+}
+
+.formo-wide-floating:hover {
+  color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+
 /* Adapt light-first playground examples & stub tokens when VitePress is in dark mode.
    Placed in @layer utilities so !important rules share the same cascade layer as Tailwind
    utilities (where higher specificity wins; unlayered !important loses to @layer !important). */

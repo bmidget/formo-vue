@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Error summary — lists every error of a form (Formo's `$form->errors()`),
+ * Error summary — lists every error of a form (`form.errors`),
  * each one linking to its control, once the form was submitted. Use inside
  * <FormoForm> (e.g. in the `#before` slot) or pass a controller:
  * <FormoErrorSummary :form="form" />. Rendered by the theme's `errorSummary` view.

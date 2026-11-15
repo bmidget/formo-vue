@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /**
- * Renders a Formo form — Formo's `form_template.php` + `$form->render()`.
+ * Renders a Formo form: the `<form>` element, its `form` view and the fields.
  *
  * ```vue
  * <FormoForm :form="form" v-model="values" @submit="save" />
  * ```
  *
- * `form` accepts a `Formo` builder, a plain definition, Formo PHP `to_array()`
- * JSON, or a controller created with `useFormo()` (for programmatic access).
+ * `form` accepts a `Formo` builder, a plain definition (or its JSON),
+ * or a controller created with `useFormo()` (for programmatic access).
  *
  * Or lay the form out yourself — the default slot replaces the automatic layout:
  *   <FormoForm :form="form">
@@ -29,7 +29,7 @@ import type {
   FormoDefinition,
   FormoDriver,
   FieldNode,
-  FormoResponse,
+  FormoOutcome,
   FormoSubmitContext,
   FormoTheme,
   FormoThemeLayer,
@@ -47,8 +47,8 @@ import {
 } from '../composables/context'
 import { leafPaths } from '../core/locate'
 import { hasContent } from './slots'
-import { useFormo } from '../composables/useFormo'
-import { csrfField } from '../http/csrf'
+import { dispatchOutcome, useFormo } from '../composables/useFormo'
+import { csrfField, isTrustedUrl, resolveCsrf } from '../http/csrf'
 import { cx } from '../core/theme'
 import { deepClone, deepEqual } from '../core/utils'
 import FormoChildren from './FormoChildren.vue'
@@ -56,7 +56,7 @@ import { nodeView } from './resolve'
 
 const props = withDefaults(
   defineProps<{
-    /** Builder, definition, PHP `to_array()` JSON, or a `useFormo()` controller */
+    /** Builder, definition (or its JSON), or a `useFormo()` controller */
     form: FormoDefinition | FormoController
     /** Form values (v-model). Merged over the definition's `val`s */
     modelValue?: Record<string, any>
@@ -75,16 +75,24 @@ const props = withDefaults(
     disabled?: boolean
     /** After validation passes, submit the <form> natively to its `action` */
     native?: boolean
-    /** Called with the (filtered) values when the form passes validation. May be async. */
-    onSubmit?: (values: Record<string, any>, ctx: FormoSubmitContext) => unknown
-    /** Called with the errors when validation fails */
-    onInvalid?: (errors: Record<string, string>) => unknown
     /**
-     * No `@submit` handler + an `attr.action` → the form sends itself with
-     * `form.request()` (CSRF, JSON, 422 mapping). These get the outcome.
+     * Called with the (filtered) values when the form passes validation. May be
+     * async: the outcome (`@success` / `@rejected`) waits for it. Return `false`,
+     * call `ctx.reject()`, set errors or throw to refuse; a request made with
+     * `ctx.request()` counts by its response. No `@submit` + an `attr.action`:
+     * the form sends itself with `request()`.
      */
-    onSuccess?: (data: any, response: FormoResponse) => unknown
-    onFailure?: (response: FormoResponse) => unknown
+    onSubmit?: (values: Record<string, any>, ctx: FormoSubmitContext) => unknown
+    /** The browser's validation stopped the submit — nothing was sent */
+    onInvalid?: (errors: Record<string, string>, outcome: FormoOutcome) => unknown
+    /** It went through: the response's data (or what `@submit` returned) */
+    onSuccess?: (data: any, outcome: FormoOutcome) => unknown
+    /** Sent, but refused (422, 419, 5xx, a thrown error, `reject()`): `outcome.reason` says why */
+    onRejected?: (outcome: FormoOutcome) => unknown
+    /** After every submit, whatever happened: `outcome.result` is `success` / `invalid` / `rejected` */
+    onSettled?: (outcome: FormoOutcome) => unknown
+    /** @deprecated Renamed `@rejected` (same argument: the outcome) */
+    onFailure?: (outcome: FormoOutcome) => unknown
   }>(),
   { disabled: false, native: false },
 )
@@ -148,7 +156,24 @@ const formEl = ref<HTMLFormElement>()
 const SPOOFED = ['PUT', 'PATCH', 'DELETE']
 const method = computed(() => String(root.value.attr.method ?? 'post').toUpperCase())
 const actionUrl = computed(() => String(root.value.attr.action ?? (typeof location !== 'undefined' ? location.href : '')))
-const csrfInput = ref<{ name: string; value: string } | null>(null)
+/**
+ * A token given as a string (`config.csrf.token`, e.g. from an Inertia shared
+ * prop) is known right away — so server-rendered HTML has the field too, and a
+ * post with JavaScript off passes Laravel's CSRF check. (Meta tags and cookies are read once mounted.)
+ */
+function knownCsrfField(): { name: string; value: string } | null {
+  const { csrf: config, request } = options.value.config
+  const token = config && typeof config === 'object' ? config.token : undefined
+  if (typeof token !== 'string' || !token) return null
+  const csrf = resolveCsrf(config)
+  return csrf && isTrustedUrl(actionUrl.value, csrf, request.baseUrl) ? { name: csrf.field, value: token } : null
+}
+const csrfInput = ref<{ name: string; value: string } | null>(knownCsrfField())
+/**
+ * `_token` / `_method` for native posts — and for any form with an `action`, so
+ * it still posts correctly with JavaScript off (`request()` sends the values, not these fields)
+ */
+const postsNatively = computed(() => options.value.config.native || !!root.value.attr.action)
 
 async function refreshCsrfField() {
   const { csrf, request } = options.value.config
@@ -157,7 +182,7 @@ async function refreshCsrfField() {
 }
 
 onMounted(() => {
-  if (options.value.config.native) refreshCsrfField()
+  if (postsNatively.value) refreshCsrfField()
 })
 
 async function nativeSubmit() {
@@ -172,19 +197,35 @@ async function nativeSubmit() {
   formEl.value?.submit()
 }
 
+// What @submit returns counts (false, a response…): the controller works out the outcome
 const offSubmit = controller._onSubmit(async (values, ctx) => {
+  let result: unknown
   if (props.onSubmit) {
-    await props.onSubmit(values, ctx)
+    result = await props.onSubmit(values, ctx)
   } else if (!options.value.config.native && root.value.attr.action) {
     // Self-submitting form: <FormoForm :form="form"> with attr: { action: '/api/profile', method: 'put' }
-    const response = await ctx.request()
-    if (response.ok) await props.onSuccess?.(response.data, response)
-    else await props.onFailure?.(response)
+    result = await ctx.request()
   }
-  if (options.value.config.native) await nativeSubmit()
+  // Native post (to `action`) — unless the handler refused or set errors
+  if (options.value.config.native && result !== false && !Object.keys(controller.flatErrors).length) await nativeSubmit()
+  return result
 })
-const offInvalid = controller._onInvalid(async (errors) => {
-  await props.onInvalid?.(errors)
+
+let warnedFailure = false
+const offOutcome = controller._onOutcome((outcome) => {
+  if (props.onFailure && !props.onRejected && import.meta.env?.DEV && !warnedFailure) {
+    warnedFailure = true
+    console.warn('[formo] <FormoForm @failure> is now @rejected (same argument: the outcome)')
+  }
+  return dispatchOutcome(
+    {
+      onSuccess: props.onSuccess,
+      onInvalid: props.onInvalid,
+      onRejected: props.onRejected ?? props.onFailure,
+      onSettled: props.onSettled,
+    },
+    outcome,
+  )
 })
 
 // Custom layout: a field nobody placed isn't rendered, so it isn't validated either — say so
@@ -209,7 +250,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   offOptions()
   offSubmit()
-  offInvalid()
+  offOutcome()
 })
 
 /* ---- v-model ------------------------------------------------------------ */
@@ -241,7 +282,7 @@ const formAttrs = computed<Record<string, unknown>>(() => {
     ...attr,
     // HTML forms only GET/POST: other verbs are spoofed with a `_method` field (Laravel @method)
     method: SPOOFED.includes(method.value) ? 'post' : method.value.toLowerCase(),
-    // Formo_Driver_Group::added — file fields make the whole form multipart
+    // File fields make the whole form multipart
     enctype: (attr.enctype as string | undefined) ?? (hasFileField(root.value) ? 'multipart/form-data' : undefined),
   }
 })
@@ -297,7 +338,7 @@ defineExpose({ form: controller })
     @submit.prevent="controller.submit($event)"
     @reset.prevent="controller.reset()"
   >
-    <template v-if="options.config.native">
+    <template v-if="postsNatively">
       <input v-if="csrfInput" type="hidden" :name="csrfInput.name" :value="csrfInput.value" />
       <input v-if="SPOOFED.includes(method)" type="hidden" name="_method" :value="method" />
     </template>

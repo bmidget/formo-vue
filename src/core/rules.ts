@@ -56,6 +56,14 @@ function parseSize(size: unknown): number {
 
 const num = (v: unknown) => (v === '' || v === null || v === undefined ? NaN : Number(v))
 
+/** `gt` / `gte` / `lt` / `lte`: empty on either side passes (nothing to compare yet), non-numbers fail */
+function compareNumbers(value: unknown, other: unknown, test: (a: number, b: number) => boolean): boolean {
+  if (isEmptyValue(value) || isEmptyValue(other)) return true
+  const a = num(value)
+  const b = num(other)
+  return !Number.isNaN(a) && !Number.isNaN(b) && test(a, b)
+}
+
 /** Rules that make a field required only under a condition (shown with the required marker when it holds) */
 export const conditionalRequiredRules = new Set([
   'required_if',
@@ -105,9 +113,8 @@ export function conditionHolds(
 }
 
 /**
- * Built-in rules. Names follow VeeValidate (`@vee-validate/rules`), Kohana names
- * are accepted as aliases (see `ruleAliases`). Every rule except `required`
- * passes on empty values, like Kohana's Validation.
+ * Built-in rules. Names follow VeeValidate (`@vee-validate/rules`) and Laravel.
+ * Every rule except `required` (and `accepted`) passes on empty values.
  */
 export const builtinRules: Record<string, RuleFn> = {
   required: (v) => vee.required(v),
@@ -141,14 +148,8 @@ export const builtinRules: Record<string, RuleFn> = {
   /** `confirmed:@password` — equal to another field */
   confirmed: (v, p) => isEmptyValue(v) && isEmptyValue(p[0]) || String(v ?? '') === String(p[0] ?? ''),
 
-  /**
-   * Kohana `matches`. Supports both `['matches', [':validation', 'password_confirm', 'password']]`
-   * (Kohana signature) and `'matches:@password'` / `['matches', ['password']]`.
-   */
+  /** `matches:@password` — equal to another field (Laravel `same`); `['matches', ['password']]` works too */
   matches: (v, p, ctx) => {
-    if (p.length >= 3 && isPlainObject(p[0])) {
-      return String(p[0][p[1]] ?? '') === String(p[0][p[2]] ?? '')
-    }
     const other = typeof p[0] === 'string' && !(p[0] in ctx.parentValues) ? p[0] : getPath(ctx.parentValues, String(p[0]))
     return String(v ?? '') === String(other ?? '')
   },
@@ -161,7 +162,7 @@ export const builtinRules: Record<string, RuleFn> = {
     return re.test(String(v))
   },
   date: (v) => isEmptyValue(v) || !Number.isNaN(Date.parse(String(v))),
-  /** Kohana `phone`: 7, 10 or 11 digits once formatting is stripped (custom lengths as params) */
+  /** `phone`: 7, 10 or 11 digits once formatting is stripped (custom lengths as params: `phone:8,12`) */
   phone: (v, p) => {
     if (isEmptyValue(v)) return true
     const lengths = p.length ? p.flat().map(Number) : [7, 10, 11]
@@ -175,7 +176,7 @@ export const builtinRules: Record<string, RuleFn> = {
   /** At least N items (checkboxes, multiple selects) */
   min_items: (v, p) => isEmptyValue(v) || toArray(v).length >= Number(p[0]),
   max_items: (v, p) => isEmptyValue(v) || toArray(v).length <= Number(p[0]),
-  /** Kohana Upload::size style limits (`1M`, `500K`) */
+  /** File size limit with a unit: `upload_size:1M`, `upload_size:500K` */
   upload_size: (v, p) => {
     const files = toFiles(v)
     const kb = parseSize(p[0])
@@ -189,6 +190,13 @@ export const builtinRules: Record<string, RuleFn> = {
   numbers: (v) => isEmptyValue(v) || /\p{N}/u.test(String(v)),
   /** Laravel `Password::symbols()`: at least one symbol */
   symbols: (v) => isEmptyValue(v) || /[\p{Z}\p{S}\p{P}]/u.test(String(v)),
+  /** Laravel `accepted`: checked / "yes" / "on" / 1 / true — fails when empty (terms of service) */
+  accepted: (v) => v === true || v === 1 || ['1', 'yes', 'on', 'true'].includes(String(v ?? '').toLowerCase()),
+  /* Laravel's numeric comparisons: `gt:0`, or another field — `gte:@start` (passes while either side is empty) */
+  gt: (v, p) => compareNumbers(v, p[0], (a, b) => a > b),
+  gte: (v, p) => compareNumbers(v, p[0], (a, b) => a >= b),
+  lt: (v, p) => compareNumbers(v, p[0], (a, b) => a < b),
+  lte: (v, p) => compareNumbers(v, p[0], (a, b) => a <= b),
   /* Laravel's conditional requirements. The first param names another field (`type` or `@type`) */
   /** `required_if:type,business` — required when `type` is one of the values (or truthy when none given) */
   required_if: (v, _p, ctx) => !conditionHolds('required_if', ctx) || vee.required(v),
@@ -206,7 +214,7 @@ export const builtinRules: Record<string, RuleFn> = {
   exclude_if: () => true,
   /** `exclude_unless:type,business` */
   exclude_unless: () => true,
-  /** HTML5 `min` / `max` / `step` attributes of number & range inputs (Formo::range) */
+  /** HTML5 `min` / `max` / `step` attributes of number & range inputs */
   html5_range: (v, _p, ctx) => {
     if (isEmptyValue(v)) return true
     const value = num(v)
@@ -221,33 +229,6 @@ export const builtinRules: Record<string, RuleFn> = {
     }
     return true
   },
-}
-
-/** Kohana / Formo rule names → built-in names */
-export const ruleAliases: Record<string, string> = {
-  not_empty: 'required',
-  min_length: 'min',
-  max_length: 'max',
-  exact_length: 'length',
-  digit: 'numeric',
-  alpha_numeric: 'alpha_num',
-  range: 'between',
-  equals: 'is',
-  in_array: 'one_of',
-  'Formo::range': 'html5_range',
-  'Upload::not_empty': 'required',
-  'Upload::type': 'ext',
-  'Upload::size': 'upload_size',
-  'Upload::image': 'image',
-}
-
-/** Rules that never fail (Upload::valid only makes sense server side) */
-const noopRules = new Set(['Upload::valid'])
-
-export function canonicalRuleName(name: string): string {
-  if (ruleAliases[name]) return ruleAliases[name]
-  const stripped = name.replace(/^Valid::/, '')
-  return ruleAliases[stripped] ?? stripped
 }
 
 /* -------------------------------------------------------------------------- */
@@ -267,19 +248,10 @@ export function isVeeSchema(value: unknown): boolean {
   )
 }
 
-const isPseudo = (v: unknown) => typeof v === 'string' && /^:[a-z_]+$/.test(v)
-
 /** `'min:3'` → `{ name: 'min', params: ['3'] }` */
 function parseRuleString(str: string): RuleSpec {
   const idx = str.indexOf(':')
-  // `Formo::range` / `Valid::email` have `::` — that's part of the name
-  if (idx === -1 || str.slice(idx, idx + 2) === '::') {
-    const nsIdx = str.indexOf(':', str.indexOf('::') + 2)
-    if (str.includes('::') && nsIdx !== -1) {
-      return { name: str.slice(0, nsIdx), params: str.slice(nsIdx + 1).split(',') }
-    }
-    return { name: str.trim(), params: [] }
-  }
+  if (idx === -1) return { name: str.trim(), params: [] }
   return { name: str.slice(0, idx).trim(), params: str.slice(idx + 1).split(',') }
 }
 
@@ -298,12 +270,11 @@ function parseRuleItem(item: RuleItem): RuleSpec[] {
     return [{ name: 'schema', params: [], schema: item }]
   }
   if (Array.isArray(item)) {
+    // A tuple: `['regex', [/^[a-z]+$/]]`, `[myRule, [3]]`
     const [rule, params = []] = item
     const list = toArray(params as unknown[])
-    if (typeof rule === 'function') {
-      return [{ name: rule.name || 'custom', params: list, callable: rule, kohana: list.some(isPseudo) }]
-    }
-    return [{ name: String(rule), params: list, kohana: list.some(isPseudo) }]
+    if (typeof rule === 'function') return [{ name: rule.name || 'custom', params: list, fn: rule as RuleFn }]
+    return [{ name: String(rule), params: list }]
   }
   if (isPlainObject(item) && !('rule' in item)) {
     // VeeValidate object notation inside a list
@@ -317,16 +288,16 @@ function parseRuleItem(item: RuleItem): RuleSpec[] {
       label?: string
     }
     if (typeof rule === 'function') return [{ name: rule.name || 'custom', params, fn: rule, message, label }]
-    return [{ name: rule, params, message, label, kohana: params.some(isPseudo) }]
+    return [{ name: rule, params, message, label }]
   }
   return []
 }
 
-/** Is this array a single Kohana tuple (`['min_length', [':value', 3]]`) rather than a list of rules? */
+/** Is this array a single tuple (`['between', [1, 10]]`) rather than a list of rules? */
 function isSingleTuple(input: unknown[]): boolean {
   if (input.length !== 2 || typeof input[0] !== 'string' || !Array.isArray(input[1])) return false
   const params = input[1] as unknown[]
-  return params.some(isPseudo) || (params.length > 0 && typeof params[0] !== 'string' && typeof params[0] !== 'function')
+  return params.length > 0 && typeof params[0] !== 'string' && typeof params[0] !== 'function'
 }
 
 export function parseRules(input: RulesInput | undefined | null): { specs: RuleSpec[]; veeSchema?: unknown } {
@@ -357,7 +328,7 @@ export function parseRules(input: RulesInput | undefined | null): { specs: RuleS
 }
 
 export function hasRule(specs: RuleSpec[], name: string): boolean {
-  return specs.some((s) => canonicalRuleName(s.name) === name)
+  return specs.some((s) => s.name === name)
 }
 
 /* -------------------------------------------------------------------------- */
@@ -382,38 +353,20 @@ function resolveRef(ref: string, ctx: RuleContext): unknown {
   return relative !== undefined ? relative : getPath(ctx.values, path)
 }
 
-function substitute(param: unknown, value: unknown, ctx: RuleContext): unknown {
-  if (typeof param !== 'string') return param
-  if (param.startsWith('@') && param.length > 1) return resolveRef(param, ctx)
-  switch (param) {
-    case ':value':
-      return value
-    case ':field':
-    case ':alias':
-      return ctx.alias
-    case ':validation':
-    case ':form_val':
-    case ':values':
-      return ctx.parentValues
-    case ':form':
-      return ctx.form
-    case ':formo':
-      return ctx.node
-    default:
-      return param
-  }
+/** `@other_field` params become that field's value */
+function substitute(param: unknown, ctx: RuleContext): unknown {
+  if (typeof param === 'string' && param.startsWith('@') && param.length > 1) return resolveRef(param, ctx)
+  return param
 }
 
 /** What `:param1`, `:other`... show in messages (field refs become labels) */
 function displayParams(spec: RuleSpec, name: string, ctx: RuleContext, opts: RunRulesOptions) {
-  const shown: unknown[] = spec.params
-    .filter((p) => !(spec.kohana && isPseudo(p)))
-    .map((p) => (typeof p === 'string' && p.startsWith('@') ? opts.labelFor(p.slice(1)) : p))
+  const shown: unknown[] = spec.params.map((p) => (typeof p === 'string' && p.startsWith('@') ? opts.labelFor(p.slice(1)) : p))
 
   const extra: Record<string, unknown> = { params: shown }
 
   if (name === 'matches' || name === 'confirmed') {
-    const refs = spec.params.filter((p) => typeof p === 'string' && !isPseudo(p)) as string[]
+    const refs = spec.params.filter((p) => typeof p === 'string') as string[]
     const other = refs.map((r) => r.replace(/^@/, '')).filter((r) => r !== String(ctx.alias)).pop()
     extra.other = other ? opts.labelFor(other) : ''
   }
@@ -440,6 +393,11 @@ const laravelParamNames: Record<string, string[]> = {
   size: ['max'],
   upload_size: ['max'],
   dimensions: ['width', 'height'],
+  // "The :attribute field must be greater than :value." — the compared number (or field)
+  gt: ['value'],
+  gte: ['value'],
+  lt: ['value'],
+  lte: ['value'],
 }
 
 /** Everything a message can use: `:field`/`:attribute`, `:value`, `:param1`…, `:params`, `:other` + Laravel names */
@@ -459,7 +417,7 @@ function messageParams(spec: RuleSpec | undefined, name: string, value: unknown,
 }
 
 /**
- * The final (translated, interpolated) message for a failed rule. Formo's lookup order:
+ * The final (translated, interpolated) message for a failed rule. Lookup order:
  *
  *  1. the rule's own `message`, the field's `errorMessages[rule]` (run through `translate`)
  *  2. `path.rule`, `parent.alias.rule`, `alias.rule`, `path.default`, `alias.default`, `rule`, `default`
@@ -505,9 +463,9 @@ async function runSchema(schema: StandardSchemaLike, value: unknown): Promise<st
   return true
 }
 
-/** The name a spec runs under (Kohana aliases resolved, inline functions keep theirs) */
+/** The name a spec runs under */
 function specName(spec: RuleSpec): string {
-  return spec.fn || spec.callable || spec.schema ? spec.name : canonicalRuleName(spec.name)
+  return spec.name
 }
 
 /** Run one rule. `message` is set when it fails */
@@ -518,7 +476,6 @@ async function runRule(
   opts: RunRulesOptions,
 ): Promise<{ name: string; passed: boolean; message?: string }> {
   const name = specName(spec)
-  if (noopRules.has(spec.name)) return { name, passed: true }
   const ruleCtx: RuleContext = { ...ctx, rule: name, rawParams: spec.params }
 
   let result: boolean | string | undefined | void
@@ -528,21 +485,12 @@ async function runRule(
     if (typeof result === 'string' && (ctx.node.errorMessages.schema || spec.message)) {
       result = false
     }
-  } else if (spec.callable) {
-    // Kohana style callable: params are passed positionally after substitution
-    result = spec.params.length
-      ? await spec.callable(...spec.params.map((p) => substitute(p, value, ruleCtx)))
-      : await spec.callable(value, ruleCtx)
   } else {
     const fn = spec.fn ?? opts.rules[name]
     if (!fn) {
       throw new Error(`[formo] Unknown validation rule "${spec.name}". Register it with createFormo({ rules: { ${name}: fn } }).`)
     }
-    let params = spec.params.map((p) => substitute(p, value, ruleCtx))
-    if (spec.kohana && !spec.fn) {
-      // Named Kohana rules receive the value separately, drop the `:value` placeholder
-      params = params.filter((_p, i) => spec.params[i] !== ':value')
-    }
+    const params = spec.params.map((p) => substitute(p, ruleCtx))
     result = await fn(value, params, ruleCtx)
   }
 
@@ -611,7 +559,6 @@ export async function evaluateChecklist(
 
   for (const spec of specs) {
     const name = specName(spec)
-    if (noopRules.has(spec.name)) continue
     const ruleCtx: RuleContext = { ...ctx, rule: name, rawParams: spec.params }
     // `required` (and its conditional variants / exclude directives) are implied — listed only with a label
     const implied = name === 'required' || conditionalRequiredRules.has(name) || excludeRules.has(name)
@@ -655,16 +602,16 @@ export function collectFieldRules(
   for (const item of driverRules ?? []) extra.push(...parseRuleItem(item))
 
   // Don't duplicate rules the user already defined (user's win, their params may differ)
-  const ownNames = new Set(own.map((s) => canonicalRuleName(s.name)))
+  const ownNames = new Set(own.map((s) => s.name))
   const merged = extra.filter((s, i, all) => {
-    const n = canonicalRuleName(s.name)
-    return !ownNames.has(n) && all.findIndex((o) => canonicalRuleName(o.name) === n) === i
+    const n = s.name
+    return !ownNames.has(n) && all.findIndex((o) => o.name === n) === i
   })
 
   // `required` (and conditional variants) run first so "must not be empty" wins over format errors
   const all = [...merged, ...own]
   const first = (s: RuleSpec) => {
-    const n = canonicalRuleName(s.name)
+    const n = s.name
     return n === 'required' || conditionalRequiredRules.has(n)
   }
   return [...all.filter(first), ...all.filter((s) => !first(s))]
@@ -676,7 +623,7 @@ export function isCurrentlyRequired(
   ctx: Pick<RuleContext, 'values' | 'parentValues'>,
 ): boolean {
   return specs.some((spec) => {
-    const name = canonicalRuleName(spec.name)
+    const name = spec.name
     if (name === 'required') return true
     return conditionalRequiredRules.has(name) && conditionHolds(name, { ...ctx, rawParams: spec.params })
   })
@@ -685,7 +632,7 @@ export function isCurrentlyRequired(
 /** Does an `exclude_if` / `exclude_unless` rule currently take this field out? */
 export function isExcludedByRules(specs: RuleSpec[], ctx: Pick<RuleContext, 'values' | 'parentValues'>): boolean {
   return specs.some((spec) => {
-    const name = canonicalRuleName(spec.name)
+    const name = spec.name
     return excludeRules.has(name) && conditionHolds(name, { ...ctx, rawParams: spec.params })
   })
 }

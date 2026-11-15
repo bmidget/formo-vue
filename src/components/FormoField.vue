@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="H extends FormoHandle">
 /**
  * Render any field, subform or repeatable group of a form, from its handle —
- * Formo's `$form->email->render()`:
+ * a field, a subform or a repeatable group, anywhere:
  *
  *   <FormoField :field="form.fields.email" />                 label, control, help, errors (the theme's view)
  *   <FormoField :field="form.fields.address" />               a whole subform

@@ -6,7 +6,7 @@ import type { FieldDef } from 'formo-vue'
 const aliases = (f: Formo) => f.fields().map((x) => x.alias())
 
 describe('Formo builder', () => {
-  it('mirrors the PHP add() signatures', () => {
+  it('supports every add() signature', () => {
     const form = Formo.form({ alias: 'user' })
       .add('username')
       .add('notes', 'textarea', 'My notes')
@@ -60,15 +60,19 @@ describe('Formo builder', () => {
     expect(aliases(form.field('address')!)).toEqual(['street', 'city'])
   })
 
-  it('adds and removes rules with Kohana names', () => {
+  it('adds and removes rules', () => {
     const form = Formo.form()
       .add('username')
-      .addRulesFields({ username: [['not_empty'], ['min_length', [':value', 3]]] })
+      .addRulesFields({ username: [['required'], ['min', [3]]] })
     const username = form.field('username')!
     expect(username.isRequired()).toBe(true)
     username.removeRule('required')
     expect(username.isRequired()).toBe(false)
-    expect(username.get('rules')).toEqual([['min_length', [':value', 3]]])
+    expect(username.get('rules')).toEqual([['min', [3]]])
+
+    const piped = Formo.form().add('email', { rules: 'required|email|max:255' }).field('email')!
+    piped.removeRule('email')
+    expect(piped.get('rules')).toEqual(['required|max:255'])
   })
 
   it('supports attr / addClass / set with dot syntax', () => {
@@ -95,36 +99,26 @@ describe('Formo builder', () => {
 })
 
 describe('normalize', () => {
-  it('reads Formo PHP to_array() output', () => {
-    // Shape produced by $form->to_array()
-    const json = {
+  it('reads JSON definitions (Formo.fromJSON) — null attributes are left out', () => {
+    const json = JSON.stringify({
       alias: 'user',
-      driver: 'form',
-      template: null,
       val: { username: 'ben' },
-      opts: [],
       attr: { class: null, id: 'user' },
-      rules: [],
-      filters: [],
-      callbacks: [],
-      html: null,
-      render: true,
-      label: '_NOTSET',
       fields: [
-        { alias: 'username', driver: 'input', val: 'ben', opts: [], attr: { class: null, id: 'username' }, rules: [['not_empty']], label: '_NOTSET', render: true, fields: [] },
-        { alias: 'email', driver: 'input', val: null, attr: { class: null, type: 'email' }, rules: [], label: 'E-mail', fields: [] },
-        { alias: 'hobby', driver: 'select', val: 'swim', opts: { run: 'Running', swim: 'Swimming' }, attr: { class: null }, rules: [], label: '_NOTSET', fields: [] },
+        { alias: 'username', driver: 'input', attr: { class: null }, rules: 'required' },
+        { alias: 'email', driver: 'input|email', label: 'E-mail' },
+        { alias: 'hobby', driver: 'select', val: 'swim', opts: { run: 'Running', swim: 'Swimming' } },
       ],
-    }
+    })
     const node = normalize(Formo.fromJSON(json), { drivers: defaultDrivers })
     expect(node.fields.map((f) => [f.alias, f.driver, f.type, f.label])).toEqual([
       ['username', 'input', 'text', undefined],
       ['email', 'input', 'email', 'E-mail'],
       ['hobby', 'select', undefined, undefined],
     ])
-    expect(node.fields[0].rules[0].name).toBe('not_empty')
-    expect(node.fields[0].attr).toEqual({ id: 'username', type: 'text' })
-    expect(buildInitialValues(node, defaultDrivers, defaultConfig)).toEqual({ username: 'ben', email: null, hobby: 'swim' })
+    expect(node.fields[0].rules[0].name).toBe('required')
+    expect(node.fields[0].attr).toEqual({ type: 'text' })
+    expect(buildInitialValues(node, defaultDrivers, defaultConfig)).toEqual({ username: 'ben', email: '', hobby: 'swim' })
   })
 
   it('understands driver shorthands', () => {

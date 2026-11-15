@@ -2,7 +2,7 @@
 aside: false
 ---
 
-# Advanced & Migration
+# Advanced
 
 ## Repeatable Groups (Blueprints)
 
@@ -16,8 +16,12 @@ Formo blueprints let users add and remove rows with `min`/`max` bounds, pre-fill
 
 <Demo name="laravel" />
 
-## Migrating from PHP `to_array()`
+## Forms from Models & Schemas
 
-Render JSON exported directly from Formo (PHP) `$form->to_array()` for a gradual migration path:
+Build a form from Laravel FormRequest rules, a backend model (IR JSON v1 — an Inertia prop or an endpoint), JSON Schema, OpenAPI or Zod, with `only` / `except` / overrides. See [Forms from Models & Schemas](/schema).
 
-<Demo name="from-php" />
+## Submit Outcomes & Live Values
+
+Every submit ends as `success`, `invalid` (the browser stopped it, nothing was sent) or `rejected` (sent, but refused: `outcome.reason` is `validation`, `session`, `server`, `handler` or `error`). `<FormoForm>` fires `@success`, `@invalid` or `@rejected`, then `@settled`. The outcome is worked out from what happened during the submit — a request made with `ctx.request()`, errors set, `ctx.reject()`, a thrown error — so `@submit` doesn't have to report it. Callback APIs like Inertia's router return a promise that settles when they do.
+
+Values from outside stay live: with `initialValues` as a ref or getter, or a reactive definition (`() => Formo.fromModel(model, { values: props.user })`), the fields not changed in the form follow the new values. The user's edits are kept. See the README's *Submit outcomes* and *Values from outside*.

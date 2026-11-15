@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * `<select>` for the `select` driver — Formo's `opts/select_template.php`:
+ * `<select>` for the `select` driver:
  * optional blank option, optgroups, and `multiple` (array value).
  * Option values keep their JS type (numbers stay numbers).
  */

@@ -47,7 +47,7 @@ const form = useFormo(
       Formo.group('misc', { label: 'Other drivers' })
         .add('notes', 'textarea', { attr: { rows: 3 } })
         .add('avatar', 'file', { rules: 'ext:png,jpg,jpeg,gif', message: 'PNG, JPG or GIF' })
-        .add('attachments', 'file', { attr: { multiple: true }, rules: [['Upload::size', [':value', '2M']]] })
+        .add('attachments', 'file', { attr: { multiple: true }, rules: 'upload_size:2M' })
         .add('member_since', 'input|date', '2014-05-01', { editable: false, message: 'editable: false renders the value as text' })
         .addGroup('level', 'select', { 1: 'Beginner', 2: 'Expert' }, '2', { editable: false })
         .add('locked', { val: 'Disabled input', attr: { disabled: true } }),

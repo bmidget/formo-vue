@@ -100,7 +100,7 @@ export default defineComponent({
     parentAlias: { type: [String, Number], default: undefined },
     /** Registry path of the containing group */
     groupPath: { type: String, default: '' },
-    /** `field`: label, control, help, errors · `input`: the control only (Formo's `$field->input()`) */
+    /** `field`: label, control, help, errors · `input`: the control only */
     part: { type: String as PropType<'field' | 'input'>, default: 'field' },
   },
   setup(props, { slots: ownSlots }) {
@@ -156,7 +156,7 @@ export default defineComponent({
       bails: bails.value,
     })
 
-    /** One validator per field: compiles Formo/Kohana/vee rules and runs them in order */
+    /** One validator per field: compiles its rules (strings, objects, functions, schemas) and runs them in order */
     const validator = async (value: unknown) => {
       const errors = await runRules(specs.value, value, ruleContext(), runOptions())
       if (!errors.length) return true
@@ -258,8 +258,12 @@ export default defineComponent({
       if (explicit !== undefined && explicit !== null && explicit !== '') return String(explicit)
       return config.value.autoId ? toId(form.alias, props.path) : ''
     })
-    // The form alias prefixes names when the *form* namespaces (groups are already in the path)
-    const name = computed(() => toName(form.options.config.namespaces ? form.alias : undefined, props.path))
+    // The form alias (or `namePrefix`) prefixes names when the *form* namespaces (groups are already in the path)
+    const name = computed(() => {
+      const { namespaces, namePrefix } = form.options.config
+      const prefix = namePrefix === undefined ? form.alias : namePrefix || undefined
+      return toName(namespaces ? prefix : undefined, props.path)
+    })
     const helpId = computed(() => `${id.value || toId(form.alias, props.path)}-help`)
     const errorId = computed(() => `${id.value || toId(form.alias, props.path)}-error`)
     const checklistId = computed(() => `${id.value || toId(form.alias, props.path)}-checklist`)

@@ -14,7 +14,7 @@ import type {
 } from '../types'
 import { isTheme } from './theme'
 import { parseRules, hasRule } from './rules'
-import { NOTSET, cleanAlias, isPlainObject, setPath, toArray } from './utils'
+import { cleanAlias, isPlainObject, setPath, toArray } from './utils'
 
 /** HTML input types — `driver: 'email'` is understood as `input|email` */
 const INPUT_TYPES = new Set([
@@ -26,7 +26,7 @@ const INPUT_TYPES = new Set([
 const KNOWN_KEYS = new Set([
   'alias', 'driver', 'val', 'value', 'label', 'message', 'opts', 'options', 'blank', 'attr', 'rules',
   'required', 'errorMessages', 'error_messages', 'render', 'editable', 'ignore', 'callbacks', 'filters',
-  'order', 'component', 'props', 'model', 'view', 'template', 'classes', 'fields', 'components', 'config', 'theme',
+  'order', 'component', 'props', 'model', 'view', 'classes', 'fields', 'components', 'config', 'theme',
   'blueprint', 'min', 'max', 'addLabel', 'removeLabel', 'type', 'parent', 'errorDisplay', 'checklist', 'requirements', 'exclude', 'ignores', 'excludes',
 ])
 
@@ -64,7 +64,7 @@ function hasToSchema(value: unknown): value is { toSchema(): FieldDef } {
   return !!value && typeof (value as any).toSchema === 'function'
 }
 
-/** `['email', 'input|email', 'x@y.z', { label: 'E-mail' }]` (Formo's construct order) → FieldDef */
+/** `['email', 'input|email', 'x@y.z', { label: 'E-mail' }]` (alias, driver, val, definition) → FieldDef */
 export function constructToDef(args: unknown[]): FieldDef {
   const [alias, driver, val, opts] = args
   const def: FieldDef = { ...(isPlainObject(opts) ? (opts as FieldDef) : {}) }
@@ -149,8 +149,7 @@ function normalizeCallbacks(input: CallbacksInput | undefined): {
 } {
   const own: FormoCallbacks = { pass: [], fail: [] }
   const forChildren: Record<string, FormoCallbacks> = {}
-  // PHP json_encode(array()) → []
-  if (!input || Array.isArray(input)) return { own, forChildren }
+  if (!input) return { own, forChildren }
 
   for (const type of ['pass', 'fail'] as const) {
     const value = input[type]
@@ -194,7 +193,7 @@ function resolveDriver(def: FieldDef, drivers: Record<string, FormoDriver>, fall
   return { driver, type }
 }
 
-/** Insert children honoring Formo's `order` option (index or ['before'|'after', alias]) */
+/** Insert children honoring their `order` option (index or ['before'|'after', alias]) */
 function applyOrder(children: Array<{ node: FieldNode; order?: FieldDef['order'] }>): FieldNode[] {
   const out: FieldNode[] = []
   for (const { node, order } of children) {
@@ -221,8 +220,7 @@ function applyOrder(children: Array<{ node: FieldNode; order?: FieldDef['order']
 /**
  * Normalize a definition into a FieldNode tree.
  *
- * Accepts Formo builders, plain objects, compact tuples and the JSON produced by
- * Formo (PHP)'s `$form->to_array()`.
+ * Accepts `Formo` builders, plain objects (or their JSON) and compact tuples.
  */
 export function normalize(input: FieldInput, options: NormalizeOptions, isRoot = true): FieldNode {
   const raw = expandDotKeys({ ...toFieldDef(input) })
@@ -237,7 +235,7 @@ export function normalize(input: FieldInput, options: NormalizeOptions, isRoot =
   const attr: Record<string, unknown> = {}
   if (isPlainObject(raw.attr)) {
     for (const [k, v] of Object.entries(raw.attr)) {
-      // Formo's to_array() carries `class => NULL` etc.
+      // `null` / `undefined` attributes are left out
       if (v !== null && v !== undefined) attr[k] = v
     }
   }
@@ -251,7 +249,7 @@ export function normalize(input: FieldInput, options: NormalizeOptions, isRoot =
   const { specs, veeSchema } = parseRules(raw.rules as RulesInput)
   if (raw.required === true && !hasRule(specs, 'required')) specs.unshift({ name: 'required', params: [] })
 
-  const label = raw.label === NOTSET ? undefined : (raw.label as FieldNode['label'])
+  const label = raw.label as FieldNode['label']
   const { own: callbacks, forChildren } = normalizeCallbacks(raw.callbacks as CallbacksInput | undefined)
 
   const vars: Record<string, unknown> = {}
@@ -264,7 +262,7 @@ export function normalize(input: FieldInput, options: NormalizeOptions, isRoot =
     driver,
     type: inputType,
     val,
-    hasVal: hasVal && val !== NOTSET,
+    hasVal,
     label,
     message: raw.message as string | undefined,
     opts: (raw.opts ?? raw.options) as FieldNode['opts'],
@@ -286,8 +284,7 @@ export function normalize(input: FieldInput, options: NormalizeOptions, isRoot =
     component: rawComponent(raw.component as FieldNode['component']),
     props: raw.props as FieldNode['props'],
     model: raw.model as FieldNode['model'],
-    // Formo `template` (PHP to_array() carries `template: null`) is the view's name
-    view: rawComponent((raw.view ?? (typeof raw.template === 'string' ? raw.template : undefined)) as FieldNode['view']),
+    view: rawComponent(raw.view as FieldNode['view']),
     classes: raw.classes as FieldNode['classes'],
     fields: [],
     components: rawComponentMap(raw.components as FieldNode['components']),
@@ -300,8 +297,6 @@ export function normalize(input: FieldInput, options: NormalizeOptions, isRoot =
     removeLabel: raw.removeLabel as string | undefined,
     vars,
   }
-
-  if (node.hasVal && node.val === NOTSET) node.val = undefined
 
   if (import.meta.env?.DEV && 'wrapper' in raw && !warned.has(raw.wrapper as object)) {
     if (raw.wrapper && typeof raw.wrapper === 'object') warned.add(raw.wrapper as object)

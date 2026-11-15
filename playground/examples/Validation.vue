@@ -3,8 +3,8 @@
  * Validation runs on VeeValidate. Rules can be written in any of these
  * notations — mix them freely:
  *
- *  - Kohana / Formo arrays     [['not_empty'], ['min_length', [':value', 3]]]
- *  - VeeValidate strings       'required|min:3|confirmed:@email'
+ *  - strings (Laravel-style)   'required|min:3|confirmed:@email'
+ *  - tuples                    [['required'], ['between', [1, 10]]]
  *  - VeeValidate objects       { required: true, between: [1, 10] }
  *  - functions (sync/async)    (value, params, ctx) => true | false | 'message'
  *  - Standard Schema           z.string().min(3)  (zod, valibot, arktype)
@@ -17,8 +17,8 @@ import { Formo, FormoErrorSummary, FormoForm, useFormo, type ValidationMode } fr
 const form = useFormo(
   Formo.form({ alias: 'validation' })
     .add('username', {
-      // Kohana notation + a rule registered app-wide with createFormo({ rules })
-      rules: [['not_empty'], ['alpha_dash'], ['min_length', [':value', 3]], ['username_available']],
+      // Tuples + a rule registered app-wide with createFormo({ rules })
+      rules: [['required'], ['alpha_dash'], ['min', [3]], ['username_available']],
       message: 'Try “admin” or “ben” — checked asynchronously',
     })
     .add('email', 'input|email', { rules: 'required' })

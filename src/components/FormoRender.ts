@@ -38,19 +38,19 @@ function scoped(scope: string, path: string) {
 }
 
 /**
- * Render any part of a form on its own — Formo's `$object->render()` at every level:
+ * Render any part of a form on its own, at every level:
  *
  * ```vue
  * <FormoRender path="address" />                 <!-- a whole subform -->
  * <FormoRender path="email" />                   <!-- a field: label, control, help, errors -->
- * <FormoRender path="email" part="input" />      <!-- just the control ($field->input()) -->
+ * <FormoRender path="email" part="input" />      <!-- just the control -->
  * <FormoRender path="email" part="label" />      <!-- / errors / help / checklist (the theme's views) -->
  * <FormoRender :form="form" path="email" />      <!-- anywhere, even outside <FormoForm> -->
  * ```
  *
  * Paths resolve relative to the enclosing subform first (inside a subform's
  * custom layout, `path="street"` is `address.street`), then from the form, then
- * by alias like Formo's `find()`.
+ * by alias (searched recursively).
  *
  * Place each field once; `<FormoRest />` renders whatever you didn't place.
  */

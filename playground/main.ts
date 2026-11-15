@@ -17,7 +17,7 @@ async function usernameAvailable(value: string) {
 const app = createApp(App)
 
 /**
- * App-wide Formo setup — the equivalent of Kohana's config/formo.php.
+ * App-wide Formo setup.
  * Every option can also be set per form (<FormoForm :components ...>) or per group.
  */
 app.use(

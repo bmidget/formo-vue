@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** The `uneditable` view — a field's value as text when `editable: false` (Formo's `uneditable` span) */
+/** The `uneditable` view — a field's value as text when `editable: false` */
 import { computed } from 'vue'
 import type { FormoFieldState } from '../../composables/context'
 import { getTranslator } from '../../i18n/translator'

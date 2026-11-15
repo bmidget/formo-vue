@@ -4,6 +4,7 @@ import {
   getCurrentInstance,
   h,
   inject,
+  onMounted,
   markRaw,
   reactive,
   shallowReactive,
@@ -16,6 +17,8 @@ import {
 } from 'vue'
 import { FormContextKey, useForm } from 'vee-validate'
 import type {
+  FormoOutcome,
+  FormoOutcomeHandlers,
   FormoController,
   FormoDefinition,
   FormoArrayBinding,
@@ -31,7 +34,7 @@ import type {
 } from '../types'
 import { normalize } from '../core/normalize'
 import { buildInitialValues, filterValues } from '../core/values'
-import { deepClone, deepMerge, getPath, humanize, interpolate, isPlainObject, setPath, toSegments, unsetPath } from '../core/utils'
+import { deepClone, deepEqual, deepMerge, getPath, humanize, interpolate, isPlainObject, joinPath, setPath, toSegments, unsetPath } from '../core/utils'
 import { evaluateCondition, isActive } from '../core/conditions'
 import { isExcludedByRules, runRules } from '../core/rules'
 import { sendRequest } from '../http/request'
@@ -40,9 +43,33 @@ import { applyLayer, baseOptions, FormoGlobalKey } from './context'
 import FormoRender from '../components/FormoRender'
 import { createHandles } from './handles'
 
-export interface UseFormoOptions extends FormoOptions {
-  /** Values merged over the definition's `val`s */
-  initialValues?: Record<string, any>
+/** A FormoResponse (what `request()` resolves to) */
+function isResponse(value: unknown): value is FormoResponse {
+  return !!value && typeof value === 'object' && typeof (value as FormoResponse).ok === 'boolean' && typeof (value as FormoResponse).status === 'number' && 'response' in value
+}
+
+/** Call the handler matching an outcome, then `onSettled` */
+export async function dispatchOutcome(handlers: FormoOutcomeHandlers, outcome: FormoOutcome): Promise<void> {
+  if (outcome.result === 'success') await handlers.onSuccess?.(outcome.data, outcome)
+  else if (outcome.result === 'invalid') await handlers.onInvalid?.(outcome.errors, outcome)
+  else await handlers.onRejected?.(outcome)
+  await handlers.onSettled?.(outcome)
+}
+
+export interface UseFormoOptions extends FormoOptions, FormoOutcomeHandlers {
+  /**
+   * Values merged over the definition's `val`s. Can be a ref or a getter
+   * (`() => props.user`): when they change, the fields not changed in the form
+   * follow — see "Values from outside" in the README.
+   */
+  initialValues?: MaybeRefOrGetter<Record<string, any> | undefined>
+  /**
+   * Errors to show from the start — what the server rendered into the page after
+   * a failed native post (JavaScript off), or Inertia's `errors` prop. Flat
+   * (`{ 'phones.0.number': ['…'] }`, Laravel / Inertia keys work) or nested. Set
+   * once the fields are mounted; like any error, they clear when the field is validated again.
+   */
+  errors?: FormoErrorsInput
 }
 
 /** `':self'` / `'address.:self'` → `''` / `'address'` */
@@ -111,7 +138,7 @@ export function useFormo<D extends FormoDefinition>(
   const initialValues = computed(() =>
     deepMerge(
       buildInitialValues(root.value, resolved.value.drivers, resolved.value.config),
-      deepClone(options.initialValues ?? {}),
+      deepClone(toValue(options.initialValues) ?? {}),
     ),
   )
 
@@ -143,6 +170,15 @@ export function useFormo<D extends FormoDefinition>(
   const arrays = shallowReactive(new Map<string, FormoArrayBinding>())
   const submitHandlers: Array<(values: Record<string, any>, ctx: FormoSubmitContext) => unknown> = []
   const invalidHandlers: Array<(errors: Record<string, string>) => unknown> = []
+  const outcomeHandlers: Array<(outcome: FormoOutcome) => unknown> = []
+  if (options.onSuccess || options.onInvalid || options.onRejected || options.onSettled) {
+    outcomeHandlers.push((outcome) => dispatchOutcome(options, outcome))
+  }
+  const lastOutcome = shallowRef<FormoOutcome>()
+  /** The submit in flight: a second click gets the same promise (no double posts) */
+  let inflight: Promise<boolean> | null = null
+  /** The last response of a request made while submitting (ctx.request(), form.request()) */
+  let submitResponse: FormoResponse | undefined
   let callbackFailed = false
 
   const flatErrors = computed<Record<string, string>>(() => {
@@ -169,8 +205,22 @@ export function useFormo<D extends FormoDefinition>(
     return humanize(segs[segs.length - 1] ?? pathOrAlias)
   }
 
-  function setError(path: string, message: string | string[] | undefined) {
+  /**
+   * A server's error key → the form path. Laravel / Inertia / Rails send
+   * `phones.0.number` (and `user.email` with a root key); Formo's paths are
+   * `phones[0].number`. A path the form has, as written, always wins.
+   */
+  function toFormPath(path: string): string {
     const p = normalizeErrorPath(path)
+    if (p === '' || registry.has(p)) return p
+    let segments = toSegments(p)
+    const rootKey = active().config.request.rootKey
+    if (rootKey && segments.length > 1 && segments[0] === rootKey) segments = segments.slice(1)
+    return segments.reduce<string>((acc, segment) => joinPath(acc, segment), '')
+  }
+
+  function setError(path: string, message: string | string[] | undefined) {
+    const p = toFormPath(path)
     const entry = registry.get(p)
     const msg = Array.isArray(message) ? message[0] : message
     if (entry?.kind === 'field') {
@@ -264,7 +314,7 @@ export function useFormo<D extends FormoDefinition>(
   const isIgnored = (path: string) => inheritedFrom(path, directlyIgnored.value.ignored)
   const isExcluded = (path: string) => inheritedFrom(path, directlyIgnored.value.excluded)
 
-  /** Run group/form-level rules for groups whose fields all passed (Formo semantics) */
+  /** Run group/form-level rules for groups whose fields all passed */
   async function runGroupRules() {
     const { config, rules } = active()
     const groups = [...registry.values()]
@@ -347,6 +397,114 @@ export function useFormo<D extends FormoDefinition>(
     return result.valid && !callbackFailed && Object.keys(flatErrors.value).length === 0
   }
 
+  /**
+   * Validate, run the handler(s), and work out how it ended — from what happened,
+   * not just from what the handler returned (first match wins):
+   *
+   *  1. the handler threw                                 → rejected (`error`), a form-level message
+   *  2. it called `ctx.reject()`                          → rejected (`validation` with errors, else `handler`)
+   *  3. a request made meanwhile / returned didn't succeed → rejected (`validation` 422, `session` 419, `server`)
+   *  4. errors were set meanwhile (`setErrors`)           → rejected (`validation`)
+   *  5. it returned `false`                               → rejected (`handler`)
+   *  6. otherwise                                         → success (the response's data, or what it returned)
+   *
+   * Callback-style APIs (Inertia's router): return a promise that settles when they do.
+   */
+  async function runSubmit(
+    handler: ((values: Record<string, any>, ctx: FormoSubmitContext) => unknown) | undefined,
+    event: Event | undefined,
+  ): Promise<FormoOutcome> {
+    if (!(await validate())) {
+      const errors = { ...flatErrors.value }
+      for (const h of invalidHandlers) await h(errors)
+      return { result: 'invalid', errors }
+    }
+
+    const values = controller.getValues()
+    let rejected = false
+    submitResponse = undefined
+    const ctx: FormoSubmitContext = {
+      event,
+      setErrors: controller.setErrors,
+      setError: controller.setError,
+      reset: controller.reset,
+      form: controller,
+      request: (url, options) => controller.request(url, { values, ...options }),
+      reject: (errors) => {
+        rejected = true
+        if (typeof errors === 'string') setError('', errors)
+        else if (errors) controller.setErrors(errors)
+      },
+    }
+
+    const returned: unknown[] = []
+    try {
+      if (handler) returned.push(await handler(values, ctx))
+      else for (const h of submitHandlers) returned.push(await h(values, ctx))
+    } catch (error) {
+      if (!flatErrors.value['']) setError('', formMessage('submit_failed'))
+      if (import.meta.env?.DEV) console.error('[formo] The submit handler threw:', error)
+      return { result: 'rejected', reason: 'error', values, error, response: submitResponse, errors: { ...flatErrors.value } }
+    }
+
+    const response = (returned.find(isResponse) as FormoResponse | undefined) ?? submitResponse
+    const errors = () => ({ ...flatErrors.value })
+    const hasErrors = () => Object.keys(flatErrors.value).length > 0
+    if (rejected) return { result: 'rejected', reason: hasErrors() ? 'validation' : 'handler', values, response, errors: errors() }
+    if (response && !response.ok) {
+      const reason = response.status === 422 ? 'validation' : response.status === 419 ? 'session' : 'server'
+      return { result: 'rejected', reason, values, response, errors: errors() }
+    }
+    if (hasErrors()) return { result: 'rejected', reason: 'validation', values, response, errors: errors() }
+    if (returned.includes(false)) return { result: 'rejected', reason: 'handler', values, response, errors: errors() }
+    const data = response ? response.data : returned.find((r) => r !== undefined && r !== true)
+    return { result: 'success', values, data, response, errors: {} }
+  }
+
+  /* ---- Values from outside ------------------------------------------------ */
+
+  /**
+   * The values from outside changed — `initialValues` as a ref / getter, or a
+   * reactive definition (`() => Formo.fromModel(model, { values: props.user })`).
+   * Fields not changed in the form follow; fields the user changed keep the
+   * user's value. Either way the new values become the baseline (`dirty`, `reset()`).
+   */
+  function followOutside(next: Record<string, any>, previous: Record<string, any> | undefined, prefix: string, changed: string[]) {
+    for (const key of Object.keys(next)) {
+      const path = joinPath(prefix, key)
+      const value = next[key]
+      const before = previous?.[key]
+      if (isPlainObject(value) && isPlainObject(before)) {
+        followOutside(value, before, path, changed)
+        continue
+      }
+      if (deepEqual(value, before)) continue
+      const current = getPath(vee.values, path)
+      const editedHere = current !== undefined && !deepEqual(current, before)
+      if (!editedHere) {
+        if (Array.isArray(value)) {
+          // Lists (repeatable rows, checkboxes): setValues() merges and rebuilds vee's field arrays
+          const partial: Record<string, any> = {}
+          setPath(partial, path, deepClone(value))
+          vee.setValues(partial, false)
+        } else {
+          vee.setFieldValue(path, deepClone(value), false)
+        }
+        changed.push(path)
+      }
+      ;(veePrivate as { setFieldInitialValue?: (path: string, value: unknown, updateOriginal?: boolean) => void })
+        .setFieldInitialValue?.(path, deepClone(value), true)
+    }
+  }
+
+  watch(initialValues, (next, previous) => {
+    if (!previous || deepEqual(next, previous)) return
+    const changed: string[] = []
+    followOutside(next, previous, '', changed)
+    // An error about the old value may not hold any more
+    for (const path of changed) if (flatErrors.value[path]) void vee.validateField(path)
+  })
+
   // A plain object: getters read computed refs so they stay reactive, and markRaw
   // keeps Vue from deep-proxying the vee-validate context when it's passed around.
   const controller: FormoController = markRaw({
@@ -390,6 +548,9 @@ export function useFormo<D extends FormoDefinition>(
     get submitCount() {
       return vee.submitCount.value
     },
+    get outcome() {
+      return lastOutcome.value
+    },
     get options() {
       return active()
     },
@@ -426,34 +587,27 @@ export function useFormo<D extends FormoDefinition>(
       return result.valid
     },
 
-    async submit(eventOrHandler?: Event | ((values: Record<string, any>, ctx: FormoSubmitContext) => unknown)) {
+    submit(eventOrHandler?: Event | ((values: Record<string, any>, ctx: FormoSubmitContext) => unknown)) {
       const handler = typeof eventOrHandler === 'function' ? eventOrHandler : undefined
       const event = typeof eventOrHandler === 'function' ? undefined : eventOrHandler
       event?.preventDefault?.()
-      vee.setTouched(true)
-      vee.submitCount.value++
-      vee.isSubmitting.value = true
-      try {
-        const valid = await validate()
-        if (valid) {
-          const values = controller.getValues()
-          const ctx: FormoSubmitContext = {
-            event,
-            setErrors: controller.setErrors,
-            setError: controller.setError,
-            reset: controller.reset,
-            form: controller,
-            request: (url, options) => controller.request(url, { values, ...options }),
-          }
-          if (handler) await handler(values, ctx)
-          else for (const h of submitHandlers) await h(values, ctx)
-        } else {
-          for (const handler of invalidHandlers) await handler({ ...flatErrors.value })
+      if (inflight) return inflight
+      inflight = (async () => {
+        vee.setTouched(true)
+        vee.submitCount.value++
+        vee.isSubmitting.value = true
+        let outcome: FormoOutcome
+        try {
+          outcome = await runSubmit(handler, event)
+        } finally {
+          vee.isSubmitting.value = false
+          inflight = null
         }
-        return valid
-      } finally {
-        vee.isSubmitting.value = false
-      }
+        lastOutcome.value = outcome
+        for (const h of outcomeHandlers) await h(outcome)
+        return outcome.result === 'success'
+      })()
+      return inflight
     },
 
     async request(url?: string, options: FormoRequestOptions = {}) {
@@ -473,6 +627,7 @@ export function useFormo<D extends FormoDefinition>(
       })
 
       if (mapErrors && !response.ok) mapResponseErrors(response)
+      if (vee.isSubmitting.value) submitResponse = response
       return response
     },
 
@@ -493,7 +648,7 @@ export function useFormo<D extends FormoDefinition>(
     },
 
     error(path: string) {
-      return flatErrors.value[normalizeErrorPath(path)]
+      return flatErrors.value[toFormPath(path)]
     },
 
     find(pathOrAlias: string) {
@@ -581,7 +736,15 @@ export function useFormo<D extends FormoDefinition>(
       invalidHandlers.push(handler)
       return () => invalidHandlers.splice(invalidHandlers.indexOf(handler) >>> 0, 1)
     },
+
+    _onOutcome(handler) {
+      outcomeHandlers.push(handler)
+      return () => outcomeHandlers.splice(outcomeHandlers.indexOf(handler) >>> 0, 1)
+    },
   }) as FormoController
+
+  // Errors from the server (a failed native post, Inertia's `errors` prop): once the fields are there
+  if (options.errors && getCurrentInstance()) onMounted(() => controller.setErrors(options.errors!))
 
   return controller as FormoController<FormoFieldsOfDefinition<D>>
 }

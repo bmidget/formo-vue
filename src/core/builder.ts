@@ -1,8 +1,10 @@
 import { markRaw, shallowRef, type ShallowRef } from 'vue'
 import type { CallbacksInput, FieldDef, FieldInput, FieldSchema, FieldsInput, FormoCallback, RuleItem, RulesInput } from '../types'
 import { constructToDef, fieldsToList } from './normalize'
-import { canonicalRuleName, parseRules } from './rules'
-import { NOTSET, cleanAlias, getPath, isPlainObject, setPath, toArray } from './utils'
+import { parseRules } from './rules'
+import { cleanAlias, getPath, isPlainObject, setPath, toArray } from './utils'
+import { formFromModel, type FormFromModelOptions } from '../schema/form'
+import type { FormoModel } from '../schema/ir'
 
 type Order = number | ['before' | 'after', string | number]
 
@@ -10,16 +12,16 @@ type Order = number | ['before' | 'after', string | number]
 function rulesToList(input: RulesInput | undefined): RulesInput[] {
   if (input === undefined || input === null) return []
   if (Array.isArray(input)) {
+    // A single tuple (`['between', [1, 10]]`) rather than a list of rules
     const single = input.length === 2 && typeof input[0] === 'string' && Array.isArray(input[1]) &&
-      ((input[1] as unknown[]).some((p) => typeof p === 'string' && p.startsWith(':')) ||
-        (input[1].length > 0 && typeof input[1][0] !== 'string' && typeof input[1][0] !== 'function'))
+      input[1].length > 0 && typeof input[1][0] !== 'string' && typeof input[1][0] !== 'function'
     return single ? [input as RuleItem] : [...(input as RuleItem[])]
   }
   return [input]
 }
 
 /**
- * The form object — a JavaScript port of Formo's PHP API.
+ * The form object: a definition you can build up and change at runtime.
  *
  * Define it in one go with a nested object (subforms are entries with `fields`):
  *
@@ -35,11 +37,11 @@ function rulesToList(input: RulesInput | undefined): RulesInput[] {
  * })
  * ```
  *
- * …or field by field, like the PHP API (both mix freely, and `.add()` keeps working after render):
+ * …or field by field (both mix freely, and `.add()` keeps working after render):
  *
  * ```ts
  * const form = Formo.form({ alias: 'user' })
- *   .add('username', { rules: [['not_empty'], ['min_length', [':value', 3]]] })
+ *   .add('username', { rules: 'required|min:3' })
  *   .add('email', 'input|email', { required: true })
  *   .add('notes', 'textarea', 'My notes')
  *   .addGroup('hobby', 'radios', { run: 'Running', swim: 'Swimming' }, 'swim')
@@ -66,7 +68,7 @@ export class Formo<D extends FieldDef = FieldDef> {
   /* ---- Factories --------------------------------------------------------- */
 
   /**
-   * A form (Formo::form). Alias defaults to `formo`.
+   * A form. Alias defaults to `formo`.
    *   Formo.form('user') · Formo.form({ alias: 'user', fields: { email: {}, bio: 'textarea' } })
    */
   static form<T extends FieldDef = FieldDef>(def?: T | string): Formo<T> {
@@ -83,12 +85,26 @@ export class Formo<D extends FieldDef = FieldDef> {
     return new Formo({ driver: 'group', ...d }) as Formo<T & { driver: 'group' }>
   }
 
-  /** Any field (Formo::factory) */
+  /** Any field */
   static factory<T extends FieldDef = FieldDef>(def: T = {} as T): Formo<T> {
     return new Formo(def) as Formo<T>
   }
 
-  /** Build from a definition or from Formo PHP `$form->to_array()` JSON */
+  /**
+   * A form from a model — every field (or `only` / `except`), with types, labels and validation:
+   * a Formo model (IR JSON v1, e.g. an Inertia prop) or one made by an adapter
+   * (`fromLaravel`, `fromJsonSchema`, `fromOpenApi`, `fromZod` from `formo-vue/schema`).
+   * Then keep going like any builder:
+   *
+   *   Formo.fromModel(props.userModel, { except: ['password'], mode: 'update' })
+   *     .add('notify', 'checkbox', { label: 'Email the user about the change' })
+   *     .order('notify', 'after', 'email')
+   */
+  static fromModel(model: FormoModel | string, options: FormFromModelOptions = {}): Formo {
+    return Formo.form(formFromModel(model, options))
+  }
+
+  /** Build from a definition — an object or its JSON (a form definition your server sends) */
   static fromJSON(json: unknown): Formo {
     const def = (typeof json === 'string' ? JSON.parse(json) : json) as FieldDef
     return new Formo(def)
@@ -98,7 +114,6 @@ export class Formo<D extends FieldDef = FieldDef> {
     const d = typeof def === 'string' ? { alias: def } : { ...def }
     const fields = d.fields
     delete d.fields
-    if (d.label === NOTSET) delete d.label
     if (d.alias !== undefined) d.alias = cleanAlias(d.alias)
     this.#def = d
     for (const field of Formo.#childList(fields)) this.#append(Formo.#toFormo(field))
@@ -204,7 +219,7 @@ export class Formo<D extends FieldDef = FieldDef> {
   }
 
   /**
-   * Formo's `add_group()`: fields that rely on options.
+   * Fields that rely on options (select, radios, checkboxes):
    *   addGroup('hobby', 'select', { run: 'Running' }, 'run', { label: 'Hobby' })
    */
   addGroup(alias: string, driver: string, opts: FieldDef['opts'], val?: unknown, settings: FieldDef = {}): this {
@@ -221,7 +236,7 @@ export class Formo<D extends FieldDef = FieldDef> {
     return this
   }
 
-  /** A direct child by alias (PHP `$form->alias` / `$form->{'0'}` for an index) */
+  /** A direct child by alias (or by index, for a number) */
   field(alias: string | number): Formo | undefined {
     return (
       this.#fields.find((f) => String(f.alias()) === String(cleanAlias(alias))) ??
@@ -230,7 +245,7 @@ export class Formo<D extends FieldDef = FieldDef> {
   }
 
   /**
-   * Find a field by alias, recursively (Formo `find()`), by dotted path
+   * Find a field by alias, recursively, by dotted path
    * (`address.street`) or by an array path (`['address', 'street']`).
    */
   find(alias: string | number | Array<string | number>, notRecursive = false): Formo | undefined {
@@ -255,7 +270,7 @@ export class Formo<D extends FieldDef = FieldDef> {
     return [...this.#fields]
   }
 
-  /** Children keyed by alias (Formo `as_array()`) */
+  /** Children keyed by alias */
   asArray(): Record<string, Formo> {
     return Object.fromEntries(this.#fields.map((f) => [String(f.alias()), f]))
   }
@@ -357,7 +372,7 @@ export class Formo<D extends FieldDef = FieldDef> {
 
   /**
    * Add a rule, in any notation:
-   *   addRule('not_empty') · addRule('min_length', [':value', 3]) · addRule(['regex', [':value', '/^a/']])
+   *   addRule('required') · addRule('min', [3]) · addRule(['regex', [/^a/]])
    *   addRule('required|email') · addRule((v) => v !== 'admin' || 'Reserved')
    */
   addRule(rule: RuleItem, params?: unknown[]): this {
@@ -393,18 +408,18 @@ export class Formo<D extends FieldDef = FieldDef> {
     return this
   }
 
-  /** Remove a rule by name (Kohana names work: `not_empty` removes `required`) */
+  /** Remove a rule by name (`removeRule('min')`) */
   removeRule(name: string): this {
-    const target = canonicalRuleName(name)
+    const target = name.trim()
     const kept: RulesInput[] = []
     for (const item of rulesToList(this.#def.rules)) {
       if (typeof item === 'string' && item.includes('|')) {
-        const rest = item.split('|').filter((part) => canonicalRuleName(part.split(':')[0].trim()) !== target)
+        const rest = item.split('|').filter((part) => part.split(':')[0].trim() !== target)
         if (rest.length) kept.push(rest.join('|'))
         continue
       }
       const specs = parseRules(item).specs
-      if (specs.length === 1 && canonicalRuleName(specs[0].name) === target) continue
+      if (specs.length === 1 && specs[0].name === target) continue
       kept.push(item)
     }
     this.#def.rules = kept as RulesInput
@@ -423,10 +438,10 @@ export class Formo<D extends FieldDef = FieldDef> {
     return this
   }
 
-  /** Formo `is_required()` */
+  /** Is this field required? */
   isRequired(): boolean {
     if (this.#def.required === true) return true
-    return parseRules(this.#def.rules).specs.some((s) => canonicalRuleName(s.name) === 'required')
+    return parseRules(this.#def.rules).specs.some((s) => s.name === 'required')
   }
 
   /* ---- Callbacks --------------------------------------------------------- */
@@ -447,7 +462,7 @@ export class Formo<D extends FieldDef = FieldDef> {
     return this
   }
 
-  /** Attach a group of callbacks: `{ pass: [...], fail: [...] }` or Formo's `{ pass: { ':self': [...], email: [...] } }` */
+  /** Attach a group of callbacks: `{ pass: [...], fail: [...] }` or by field: `{ pass: { ':self': [...], email: [...] } }` */
   callbacks(input: CallbacksInput): this {
     for (const type of ['pass', 'fail'] as const) {
       const value = input[type]
@@ -497,7 +512,7 @@ export class Formo<D extends FieldDef = FieldDef> {
   /* ---- Ordering / structure ---------------------------------------------- */
 
   /**
-   * Reorder fields (Formo `order()`):
+   * Reorder fields:
    *   order('email', 1) · order('email', 'after', 'username') · order({ email: 0, notes: ['before', 'submit'] })
    */
   order(alias: string | Record<string, Order>, newOrder?: number | 'before' | 'after', relative?: string | number): this {
@@ -519,7 +534,7 @@ export class Formo<D extends FieldDef = FieldDef> {
   }
 
   /**
-   * Move existing fields into a new subform (Formo `subform()`):
+   * Move existing fields into a new subform:
    *   subform('address', ['street', 'city', 'zip'], ['after', 'email'])
    */
   subform(alias: string, aliases: Array<string | number>, order?: Order, driver = 'group'): this {
@@ -535,7 +550,7 @@ export class Formo<D extends FieldDef = FieldDef> {
     return this
   }
 
-  /** Pull every field out of its subforms (Formo `flatten()`) */
+  /** Pull every field out of its subforms */
   flatten(): this {
     const flat: Formo[] = []
     const walk = (f: Formo) => {
@@ -550,7 +565,7 @@ export class Formo<D extends FieldDef = FieldDef> {
   }
 
   /**
-   * Blueprints: make this group repeatable, optionally pre-filled (Formo `pad_blueprint()`):
+   * Blueprints: make this group repeatable, optionally pre-filled:
    *   Formo.group('phones').add('number').padBlueprint(2)
    *   Formo.group('phones').add('number').padBlueprint([{ number: '555-1234' }])
    */
@@ -570,7 +585,7 @@ export class Formo<D extends FieldDef = FieldDef> {
 
   /* ---- Output ------------------------------------------------------------ */
 
-  /** The plain definition (what <FormoForm> renders) — children as a list, like PHP `to_array()` */
+  /** The plain definition (what <FormoForm> renders) — children as a list */
   toSchema(): FieldSchema {
     // Reading the version makes computed()s that call toSchema() reactive to mutations
     void this.version.value
@@ -579,11 +594,6 @@ export class Formo<D extends FieldDef = FieldDef> {
       def.fields = this.#fields.map((f) => f.toSchema())
     }
     return def
-  }
-
-  /** Formo `to_array()` */
-  toArray(): FieldSchema {
-    return this.toSchema()
   }
 
   toJSON(): FieldSchema {

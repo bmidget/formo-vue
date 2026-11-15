@@ -1,10 +1,11 @@
 /**
- * formo-vue — Formo's "forms as objects" for Vue 3.
+ * formo-vue — forms as objects for Vue 3.
  *
- *  - Define forms with a nested object, or the `Formo` builder (a port of the PHP API)
+ *  - Define forms with a nested object, or the `Formo` builder (change them at runtime)
+ *  - Or from a model / schema: `formo-vue/schema` (Laravel rules, JSON Schema, OpenAPI, Zod)
  *  - Render them with <FormoForm>, or field by field with <FormoField :field="form.fields.email">
- *  - Themes swap the views (Formo's PHP templates), the controls and the classes
- *  - Validate with VeeValidate (Kohana rule syntax, vee rules, functions, zod/valibot)
+ *  - Themes swap the views, the controls and the classes
+ *  - Validate with VeeValidate (rule strings and objects, functions, Laravel rules, Zod / Valibot)
  */
 
 // Components
@@ -101,11 +102,9 @@ export { normalize, findNode, fieldsToList } from './core/normalize'
 export { locate, type LocatedNode } from './core/locate'
 export {
   builtinRules,
-  ruleAliases,
   parseRules,
   runRules,
   evaluateChecklist,
-  canonicalRuleName,
   toRegExp,
 } from './core/rules'
 export { defaultDrivers } from './core/drivers'
@@ -116,6 +115,8 @@ export { normalizeOptions, flattenOptions, isOptionGroup } from './core/options'
 export { markBuiltin } from './core/builtin'
 export { resolveLabel } from './core/labels'
 export { buildInitialValues, applyFilters } from './core/values'
-export { humanize, NOTSET } from './core/utils'
+export { humanize } from './core/utils'
 
 export type * from './types'
+// Forms from models & schemas live in `formo-vue/schema` (framework-free); their main types, for props:
+export type { FormoModel, ModelField, FormFromModelOptions, FieldSpec } from './schema'

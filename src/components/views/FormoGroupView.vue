@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * The `group` view — a subform, Formo's `group_template.php`: legend, help,
+ * The `group` view — a subform: legend, help,
  * the group's own error, then its fields (the default slot).
  */
 import type { FormoGroupState } from '../../composables/context'

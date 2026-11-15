@@ -2,7 +2,7 @@
 /**
  * How a field shows its rules — `errorDisplay` (or the `checklist: true` shortcut):
  *
- *  - 'first'      the first failing rule's message (default, like Formo/Kohana)
+ *  - 'first'      the first failing rule's message (default)
  *  - 'all'        every failing rule's message
  *  - 'checklist'  every rule as a live requirement: a grey box with ✗ until the
  *                 value meets it, then ✓ — re-evaluated on every keystroke

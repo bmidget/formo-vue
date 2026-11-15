@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * A theme is Formo's template directory: the *views* that lay a form out (the
- * Vue versions of field_template.php, group_template.php…), the controls, and
- * the classes they use. Swap any of them:
+ * A theme is the *views* that lay a form out (form, group, field, label, errors…),
+ * the controls, and the classes they use. Swap any of them:
  *
  *   defineTheme({ extends: defaultTheme, views: { field: FloatingField } })   new views
  *   defineTheme({ views, components, classes })                              a whole new theme

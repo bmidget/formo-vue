@@ -18,6 +18,7 @@
     "paths": {
       "formo-vue": ["./src/index.ts"],
       "formo-vue/nuxt-ui": ["./src/nuxt-ui/index.ts"],
+      "formo-vue/schema": ["./src/schema/index.ts"],
       "#components": ["./playground/stubs/nuxt-ui/index.ts"],
       "@/components/ui/formo": ["./registry/shadcn-vue/formo/index.ts"],
       "@/components/ui/*": ["./playground/stubs/shadcn-vue/ui/*"]

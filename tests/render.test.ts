@@ -203,7 +203,7 @@ describe('parts outside <FormoForm>', () => {
     expect(save).toHaveBeenCalledWith({ email: 'ok@x.io', name: '' }, expect.anything())
   })
 
-  it('form.render(path, part) — like <?= $form->email->render() ?>', async () => {
+  it('form.render(path, part) — a component for any part, by path', async () => {
     let form!: FormoController
     const wrapper = mount(
       defineComponent({

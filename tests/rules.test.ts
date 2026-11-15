@@ -33,14 +33,15 @@ describe('parseRules', () => {
     ])
   })
 
-  it('parses Kohana tuples (list and single)', () => {
-    const list = parseRules([['not_empty'], ['min_length', [':value', 3]]]).specs
-    expect(list.map((s) => s.name)).toEqual(['not_empty', 'min_length'])
-    expect(list[1]).toMatchObject({ params: [':value', 3], kohana: true })
+  it('parses tuples (a list, and a single one)', () => {
+    const list = parseRules([['required'], ['min', [3]]]).specs
+    expect(list).toEqual([
+      { name: 'required', params: [] },
+      { name: 'min', params: [3] },
+    ])
 
-    const single = parseRules(['min_length', [':value', 3]] as any).specs
-    expect(single).toHaveLength(1)
-    expect(single[0].name).toBe('min_length')
+    const single = parseRules(['between', [1, 10]] as any).specs
+    expect(single).toEqual([{ name: 'between', params: [1, 10] }])
   })
 
   it('parses vee object notation', () => {
@@ -49,11 +50,6 @@ describe('parseRules', () => {
       { name: 'min', params: [3] },
       { name: 'between', params: [1, 5] },
     ])
-  })
-
-  it('keeps namespaced Kohana names intact', () => {
-    expect(parseRules('Formo::range').specs[0].name).toBe('Formo::range')
-    expect(parseRules('Valid::email').specs[0].name).toBe('Valid::email')
   })
 
   it('accepts functions and standard schemas', () => {
@@ -65,15 +61,15 @@ describe('parseRules', () => {
 })
 
 describe('runRules', () => {
-  it('maps Kohana names to built-ins and formats messages', async () => {
-    const { specs } = parseRules([['not_empty'], ['min_length', [':value', 3]]])
+  it('runs tuples and formats messages', async () => {
+    const { specs } = parseRules([['required'], ['min', [3]]])
     expect(await check(specs, '')).toEqual(['Field must not be empty'])
     expect(await check(specs, 'ab')).toEqual(['Field must be at least 3 characters long'])
     expect(await check(specs, 'abc')).toEqual([])
   })
 
-  it('converts PHP regex strings', async () => {
-    const { specs } = parseRules([['regex', [':value', '/^\\d{4}$/']]])
+  it('reads delimited regex strings (Laravel `regex:/…/i`)', async () => {
+    const { specs } = parseRules([['regex', ['/^\\d{4}$/']]])
     expect(await check(specs, '12a4')).toHaveLength(1)
     expect(await check(specs, '1234')).toEqual([])
   })
@@ -86,8 +82,8 @@ describe('runRules', () => {
     ])
   })
 
-  it('supports the Kohana matches signature', async () => {
-    const { specs } = parseRules([['matches', [':validation', 'confirm', 'password']]])
+  it('matches:@field — equal to another field (Laravel `same`)', async () => {
+    const { specs } = parseRules('matches:@password')
     const n = node({ alias: 'confirm' })
     expect(await check(specs, 'a', { node: n, values: { password: 'a', confirm: 'a' } })).toEqual([])
     expect(await check(specs, 'b', { node: n, values: { password: 'a', confirm: 'b' } })).toEqual([
@@ -115,7 +111,7 @@ describe('runRules', () => {
     expect(await check(specs, 'abc')).toEqual([])
   })
 
-  it('validates html5 number attributes (Formo::range)', async () => {
+  it('validates html5 number attributes (html5_range)', async () => {
     const n = node({ driver: 'input|number', attr: { min: 1, max: 10, step: 2 } })
     const specs = parseRules('html5_range').specs
     expect(await check(specs, 5, { node: n })).toEqual([])

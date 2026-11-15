@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bmidget/formo-vue/schema/formo-model.v1.schema.json",
+  "title": "Formo model (IR JSON), version 1",
+  "description": "What a backend or a schema knows about the data a form edits. Version 1 only changes additively: new optional keys, new formats; readers ignore keys they don't know and read unknown types as \"unknown\". See docs/schema.md.",
+  "type": "object",
+  "required": ["version", "fields"],
+  "properties": {
+    "version": { "const": 1 },
+    "name": { "type": "string", "description": "Suggested form alias (\"user\")" },
+    "label": { "type": "string" },
+    "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+    "messages": {
+      "type": "object",
+      "description": "Error messages for the whole form, keyed like Formo's config.messages: \"rule\", \"field.rule\", \"address.street.rule\" (Formo rule names)",
+      "additionalProperties": { "type": "string" }
+    },
+    "meta": { "type": "object", "description": "Anything about where the model comes from" }
+  },
+  "$defs": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^.*\\s\\[\\]]+$",
+      "description": "An attribute name — a form alias: no dots, spaces, brackets or *"
+    },
+    "type": {
+      "enum": ["string", "text", "integer", "number", "boolean", "date", "datetime", "time", "enum", "file", "object", "array", "relation", "unknown"]
+    },
+    "field": {
+      "allOf": [{ "$ref": "#/$defs/item" }],
+      "required": ["name", "type"],
+      "properties": { "name": { "$ref": "#/$defs/name" } }
+    },
+    "item": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "name": { "type": "string", "description": "Ignored on array items" },
+        "type": { "$ref": "#/$defs/type" },
+        "format": { "type": "string", "description": "email, url, password, tel, color, uuid, ip, search…" },
+        "label": { "type": "string" },
+        "description": { "type": "string", "description": "Help text" },
+        "placeholder": { "type": "string" },
+        "required": { "type": "boolean", "description": "Must be filled — not just present (Laravel semantics)" },
+        "nullable": { "type": "boolean", "description": "Empty means null" },
+        "default": {},
+        "options": { "type": "array", "items": { "$ref": "#/$defs/option" } },
+        "constraints": { "$ref": "#/$defs/constraints" },
+        "rules": {
+          "type": "array",
+          "description": "Extra client-side rules in Formo notation (\"required_if:type,business\", \"matches:@password\")",
+          "items": { "$ref": "#/$defs/rule" }
+        },
+        "serverRules": { "type": "array", "items": { "type": "string" }, "description": "Informative: checked by the server only" },
+        "messages": { "type": "object", "additionalProperties": { "type": "string" }, "description": "By Formo rule name" },
+        "readOnly": { "type": "boolean", "description": "Set by the server: uneditable in update forms, never submitted" },
+        "writeOnly": { "type": "boolean", "description": "Never sent back (passwords): not pre-filled, optional in update forms" },
+        "fillable": { "type": "boolean", "description": "false: not mass-assignable, never in a form unless asked for" },
+        "relation": { "$ref": "#/$defs/relation" },
+        "fields": { "type": "array", "items": { "$ref": "#/$defs/field" }, "description": "type object" },
+        "items": { "$ref": "#/$defs/item", "description": "type array: one element" },
+        "ui": { "type": "object", "description": "Formo definition keys merged over what's generated (driver, component, view, attr, props, message…)" }
+      }
+    },
+    "option": {
+      "type": "object",
+      "required": ["value"],
+      "properties": {
+        "value": { "type": ["string", "number", "boolean", "null"] },
+        "label": { "type": "string" },
+        "disabled": { "type": "boolean" }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "minLength": { "type": "number" },
+        "maxLength": { "type": "number" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "exclusiveMin": { "type": "number" },
+        "exclusiveMax": { "type": "number" },
+        "step": { "type": "number" },
+        "pattern": { "type": "string", "description": "ECMAScript regex source, unanchored" },
+        "minItems": { "type": "number" },
+        "maxItems": { "type": "number" },
+        "maxSize": { "type": "number", "description": "Kilobytes" },
+        "extensions": { "type": "array", "items": { "type": "string" } },
+        "mimeTypes": { "type": "array", "items": { "type": "string" } },
+        "accepted": { "type": "boolean" }
+      }
+    },
+    "rule": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "required": ["rule"],
+          "properties": { "rule": { "type": "string" }, "params": { "type": "array" }, "message": { "type": "string" } }
+        }
+      ]
+    },
+    "relation": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["belongsTo", "belongsToMany", "hasOne", "hasMany"] },
+        "model": { "type": "string" },
+        "key": { "type": "string", "description": "Key of the related records holding the value (default id)" }
+      }
+    }
+  }
+}

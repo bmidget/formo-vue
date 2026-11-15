@@ -51,7 +51,7 @@ export function flattenOptions(items: FormoOptionItem[]): FormoOption[] {
   return items.flatMap((item) => (isOptionGroup(item) ? item.options : [item]))
 }
 
-/** Loose equality like PHP's `==` used by Formo's templates (`1 == '1'`) */
+/** Loose equality for option values (`1` matches `'1'`) */
 export function sameValue(a: unknown, b: unknown): boolean {
   if (a === b) return true
   if (a === null || a === undefined || b === null || b === undefined) return false
