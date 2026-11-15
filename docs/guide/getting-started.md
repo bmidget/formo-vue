@@ -1,3 +1,7 @@
+---
+aside: false
+---
+
 # Getting Started
 
 `formo-vue` brings Formo's **"forms as objects"** model to Vue 3, backed by VeeValidate and Tailwind CSS.

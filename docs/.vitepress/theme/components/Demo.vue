@@ -79,7 +79,7 @@ async function copySource() {
     </div>
 
     <!-- Preview stays mounted so form state survives switching tabs -->
-    <div v-show="tab === 'preview'" ref="previewRef" class="bg-white p-5 text-slate-900 sm:p-6">
+    <div v-show="tab === 'preview'" ref="previewRef" class="formo-demo-preview bg-white p-5 text-slate-900 sm:p-6 dark:bg-slate-900 dark:text-slate-100">
       <component :is="example.component" :key="example.id" />
     </div>
 
@@ -99,7 +99,7 @@ async function copySource() {
     </div>
 
     <!-- Live FormData POST body -->
-    <div v-if="tab === 'post'" class="bg-white p-5 text-slate-900 sm:p-6">
+    <div v-if="tab === 'post'" class="formo-demo-preview bg-white p-5 text-slate-900 sm:p-6 dark:bg-slate-900 dark:text-slate-100">
       <PostBody :root="previewRef" />
     </div>
 

@@ -1,3 +1,7 @@
+---
+aside: false
+---
+
 # Defining Forms & Fields
 
 Forms can be defined as a plain nested JavaScript object, with the chainable `Formo` builder, or loaded from JSON exported by Formo PHP (`$form->to_array()`).

@@ -1,3 +1,7 @@
+---
+aside: false
+---
+
 # Formo × shadcn-vue
 
 shadcn-vue components live in your project (`components/ui/*`), so a package

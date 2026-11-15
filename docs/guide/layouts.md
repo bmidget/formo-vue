@@ -1,3 +1,7 @@
+---
+aside: false
+---
+
 # Layouts & Parts
 
 You don't have to let `<FormoForm>` render every field sequentially. Use `form.fields` handles with `<FormoField>` to place any field or subform anywhere in your own grid, card, or even outside the `<form>` element.

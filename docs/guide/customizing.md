@@ -1,3 +1,7 @@
+---
+aside: false
+---
+
 # Theming & Customizing
 
 Every field's **view** (wrapper/label/help/error layout), **control** (input widget), and **classes** can be customized per field, per driver, per group, per form, or app-wide.

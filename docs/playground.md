@@ -7,7 +7,7 @@ title: Interactive Playground
 import PlaygroundBrowser from './.vitepress/theme/components/PlaygroundBrowser.vue'
 </script>
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
   <div class="mb-6">
     <h1 class="text-2xl font-bold tracking-tight">Interactive Playground</h1>
     <p class="mt-1 text-sm opacity-75">

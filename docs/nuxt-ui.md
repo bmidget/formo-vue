@@ -1,3 +1,7 @@
+---
+aside: false
+---
+
 # Formo × Nuxt UI
 
 `formo-vue/nuxt-ui` renders Formo's fields with [Nuxt UI](https://ui.nuxt.com) (v4)
