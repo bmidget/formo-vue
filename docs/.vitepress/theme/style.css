@@ -33,77 +33,96 @@
   }
 }
 
-/* Adapt light-first playground examples & stub tokens when VitePress is in dark mode */
-.dark .formo-demo-preview {
-  color-scheme: dark;
-  background-color: #0f172a !important;
-  color: #e2e8f0 !important;
+/* Adapt light-first playground examples & stub tokens when VitePress is in dark mode.
+   Placed in @layer utilities so !important rules share the same cascade layer as Tailwind
+   utilities (where higher specificity wins; unlayered !important loses to @layer !important). */
+@layer utilities {
+  .dark .formo-demo-preview {
+    color-scheme: dark;
+    background-color: #0f172a !important;
+    color: #e2e8f0 !important;
 
-  --color-elevated: #1e293b;
-  --color-accented: #334155;
-  --color-muted: #94a3b8;
+    --color-elevated: #1e293b;
+    --color-accented: #334155;
+    --color-muted: #94a3b8;
 
-  --color-background: #0f172a;
-  --color-foreground: #f1f5f9;
-  --color-secondary: #1e293b;
-  --color-secondary-foreground: #f1f5f9;
-  --color-muted-foreground: #94a3b8;
-  --color-accent: #1e293b;
-  --color-accent-foreground: #f1f5f9;
-  --color-popover: #0f172a;
-  --color-popover-foreground: #f1f5f9;
-  --color-border: #334155;
-  --color-input: #334155;
-  --color-ring: #64748b;
-}
+    --color-background: #0f172a;
+    --color-foreground: #f1f5f9;
+    --color-secondary: #1e293b;
+    --color-secondary-foreground: #f1f5f9;
+    --color-muted-foreground: #94a3b8;
+    --color-accent: #1e293b;
+    --color-accent-foreground: #f1f5f9;
+    --color-popover: #0f172a;
+    --color-popover-foreground: #f1f5f9;
+    --color-border: #334155;
+    --color-input: #334155;
+    --color-ring: #64748b;
+  }
 
-.dark .formo-demo-preview .shadcn {
-  --color-primary: #f1f5f9;
-  --color-primary-foreground: #0f172a;
-  --color-muted: #1e293b;
-  color: #f1f5f9 !important;
-}
+  .dark .formo-demo-preview .shadcn {
+    --color-primary: #f1f5f9;
+    --color-primary-foreground: #0f172a;
+    --color-muted: #1e293b;
+    color: #f1f5f9 !important;
+  }
 
-.dark .formo-demo-preview .text-default { color: #e2e8f0 !important; }
-.dark .formo-demo-preview .text-dimmed { color: #64748b !important; }
-.dark .formo-demo-preview .text-highlighted { color: #f8fafc !important; }
-.dark .formo-demo-preview .bg-default { background-color: #020617 !important; }
-.dark .formo-demo-preview .ring-default { --tw-ring-color: #334155 !important; }
+  .dark .formo-demo-preview .text-default { color: #e2e8f0 !important; }
+  .dark .formo-demo-preview .text-dimmed { color: #64748b !important; }
+  .dark .formo-demo-preview .text-highlighted { color: #f8fafc !important; }
+  .dark .formo-demo-preview .bg-default { background-color: #020617 !important; }
+  .dark .formo-demo-preview .ring-default { --tw-ring-color: #334155 !important; }
 
-.dark .formo-demo-preview .bg-white { background-color: #1e293b !important; }
-.dark .formo-demo-preview .bg-slate-50 { background-color: #1e293b !important; }
-.dark .formo-demo-preview .bg-slate-50\/50 { background-color: rgba(30, 41, 59, 0.55) !important; }
-.dark .formo-demo-preview .bg-slate-50\/70 { background-color: rgba(30, 41, 59, 0.7) !important; }
-.dark .formo-demo-preview .bg-slate-100 { background-color: #1e293b !important; }
-.dark .formo-demo-preview .bg-slate-900 {
-  background-color: #020617 !important;
-  box-shadow: inset 0 0 0 1px #1e293b;
-}
+  .dark .formo-demo-preview .bg-white { background-color: #1e293b !important; }
+  .dark .formo-demo-preview [role='switch'] > span { background-color: #ffffff !important; }
+  .dark .formo-demo-preview .bg-white\/95 { background-color: rgba(15, 23, 42, 0.92) !important; }
+  .dark .formo-demo-preview .bg-slate-50 { background-color: #1e293b !important; }
+  .dark .formo-demo-preview .bg-slate-50\/50 { background-color: rgba(30, 41, 59, 0.55) !important; }
+  .dark .formo-demo-preview .bg-slate-50\/70 { background-color: rgba(30, 41, 59, 0.7) !important; }
+  .dark .formo-demo-preview .bg-slate-100 { background-color: #1e293b !important; }
+  .dark .formo-demo-preview .bg-indigo-50\/60 {
+    background-color: rgba(30, 41, 59, 0.55) !important;
+    box-shadow: inset 0 0 0 1px #334155;
+  }
+  .dark .formo-demo-preview .bg-rose-100\/70 { background-color: rgba(136, 19, 55, 0.35) !important; }
+  .dark .formo-demo-preview .bg-slate-900 {
+    background-color: #020617 !important;
+    box-shadow: inset 0 0 0 1px #1e293b;
+  }
 
-.dark .formo-demo-preview .text-slate-900 { color: #f1f5f9 !important; }
-.dark .formo-demo-preview .text-slate-800 { color: #e2e8f0 !important; }
-.dark .formo-demo-preview .text-slate-700 { color: #cbd5e1 !important; }
-.dark .formo-demo-preview .text-slate-600 { color: #94a3b8 !important; }
-.dark .formo-demo-preview .text-slate-500 { color: #94a3b8 !important; }
+  .dark .formo-demo-preview .text-slate-900 { color: #f1f5f9 !important; }
+  .dark .formo-demo-preview .text-slate-800 { color: #e2e8f0 !important; }
+  .dark .formo-demo-preview .text-slate-700 { color: #cbd5e1 !important; }
+  .dark .formo-demo-preview .text-slate-600 { color: #94a3b8 !important; }
+  .dark .formo-demo-preview .text-slate-500 { color: #94a3b8 !important; }
 
-.dark .formo-demo-preview .border-slate-200 { border-color: #334155 !important; }
-.dark .formo-demo-preview .border-slate-300 { border-color: #475569 !important; }
-.dark .formo-demo-preview .ring-slate-300 { --tw-ring-color: #475569 !important; }
+  .dark .formo-demo-preview .border-slate-200 { border-color: #334155 !important; }
+  .dark .formo-demo-preview .border-slate-300 { border-color: #475569 !important; }
+  .dark .formo-demo-preview .ring-slate-300 { --tw-ring-color: #475569 !important; }
 
-.dark .formo-demo-preview input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='submit']):not([type='button']):not([type='reset']),
-.dark .formo-demo-preview select,
-.dark .formo-demo-preview textarea {
-  background-color: #020617 !important;
-  color: #f1f5f9 !important;
-  border-color: #334155 !important;
-}
+  .dark .formo-demo-preview input:not(.bg-transparent):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='submit']):not([type='button']):not([type='reset']),
+  .dark .formo-demo-preview select,
+  .dark .formo-demo-preview textarea {
+    background-color: #020617 !important;
+    color: #f1f5f9 !important;
+    border-color: #334155 !important;
+  }
 
-.dark .formo-demo-preview input::placeholder,
-.dark .formo-demo-preview textarea::placeholder {
-  color: #64748b !important;
+  .dark .formo-demo-preview input::placeholder,
+  .dark .formo-demo-preview textarea::placeholder {
+    color: #64748b !important;
+  }
 }
 
 /* Let Demo code blocks use VitePress's Shiki styling cleanly inside .vp-raw */
+.vp-raw table,
+.vp-raw tr,
+.vp-raw td,
+.vp-raw th {
+  background-color: transparent !important;
+  border-color: inherit;
+}
+
 .formo-demo-code div[class*='language-'] {
   margin: 0;
   border-radius: 0;

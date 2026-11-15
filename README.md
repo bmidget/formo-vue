@@ -1,6 +1,8 @@
 # formo-vue
 
-[Formo](../kohana-formo)'s "forms as objects", rebuilt for **Vue 3**:
+[Formo](../kohana-formo)'s "forms as objects", rebuilt for **Vue 3**.
+
+> **What Formo is (and isn't):** Formo is **not a UI library**—it doesn't lock you into a closed widget kit. Instead, Formo makes working with **forms, validation, state, and styling** effortless: define your form once as an object, and render it with the built-in Tailwind theme, **Nuxt UI**, **shadcn-vue**, or your own components.
 
 - **A form is one nested object**: every field keyed by its alias, subforms nested under `fields`. The **`Formo` builder** (a port of the PHP object API: `add`, `find`, `order`, `subform`, `add_rules_fields`, `pad_blueprint`…) is still there, for changing forms at runtime
 - **`form.fields` mirrors the definition**: `<FormoField :field="form.fields.email">` renders any field, subform or repeatable group, anywhere, with typed handles

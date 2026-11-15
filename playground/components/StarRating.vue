@@ -21,7 +21,7 @@ const hover = ref(0)
       :aria-checked="n === props.modelValue"
       :aria-label="`${n} star${n > 1 ? 's' : ''}`"
       class="text-2xl leading-none transition hover:scale-110 focus-visible:outline-2 focus-visible:outline-indigo-500"
-      :class="n <= (hover || props.modelValue || 0) ? 'text-amber-400' : 'text-slate-300'"
+      :class="n <= (hover || props.modelValue || 0) ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600'"
       @mouseenter="hover = n"
       @click="emit('update:modelValue', n)"
     >

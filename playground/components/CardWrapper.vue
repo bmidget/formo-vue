@@ -11,15 +11,15 @@ defineProps<{ formo: FormoFieldState }>()
 
 <template>
   <div
-    class="rounded-xl border bg-linear-to-br from-white to-slate-50 p-4 shadow-xs"
-    :class="formo.invalid ? 'border-rose-300' : 'border-slate-200'"
+    class="rounded-xl border bg-linear-to-br from-white to-slate-50 p-4 shadow-xs dark:from-slate-800/80 dark:to-slate-900"
+    :class="formo.invalid ? 'border-rose-300 dark:border-rose-500/60' : 'border-slate-200'"
   >
     <div class="mb-3 flex items-start justify-between gap-4">
       <div>
         <slot name="label" class="font-semibold text-slate-900" />
         <slot name="help" />
       </div>
-      <span v-if="formo.required" class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+      <span v-if="formo.required" class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white dark:bg-indigo-500/20 dark:text-indigo-300">
         Required
       </span>
     </div>

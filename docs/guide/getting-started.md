@@ -6,6 +6,15 @@ aside: false
 
 `formo-vue` brings Formo's **"forms as objects"** model to Vue 3, backed by VeeValidate and Tailwind CSS.
 
+## What Formo Is (and Isn't)
+
+**Formo is not a UI library.** It doesn't try to replace your design system or lock you into a rigid set of widgets.
+
+Instead, Formo makes working with **forms, validation, state, and styling** effortless:
+- **Forms as objects**: Define fields, subforms, repeatable groups, and rules in one plain object (or with the chainable `Formo` builder).
+- **Validation & state handled**: Built on VeeValidate with Kohana rule arrays, VeeValidate strings, async functions, Zod schemas, live checklists, i18n, and Laravel CSRF support.
+- **Your UI, your styling**: Render out of the box with the built-in Tailwind theme, plug directly into **Nuxt UI** (`formo-vue/nuxt-ui`) or **shadcn-vue** (via the registry item), or drop in your own components and markup anywhere.
+
 ## Installation
 
 ```bash

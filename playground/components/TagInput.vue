@@ -43,10 +43,10 @@ function onKeydown(e: KeyboardEvent) {
     <span
       v-for="tag in tags()"
       :key="tag"
-      class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700"
+      class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300"
     >
       {{ tag }}
-      <button type="button" class="text-indigo-400 hover:text-indigo-700" :aria-label="`Remove ${tag}`" @click.stop="remove(tag)">×</button>
+      <button type="button" class="text-indigo-400 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-100" :aria-label="`Remove ${tag}`" @click.stop="remove(tag)">×</button>
     </span>
     <input
       :id="field.id"
