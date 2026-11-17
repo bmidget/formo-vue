@@ -3,6 +3,25 @@
   "version": "0.1.0",
   "description": "Formo — forms as objects — rebuilt as Vue 3 components with VeeValidate validation and Tailwind styling.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bmidget/formo-vue.git"
+  },
+  "homepage": "https://github.com/bmidget/formo-vue#readme",
+  "bugs": {
+    "url": "https://github.com/bmidget/formo-vue/issues"
+  },
+  "keywords": [
+    "vue",
+    "vue3",
+    "forms",
+    "formo",
+    "vee-validate",
+    "zod",
+    "laravel",
+    "tailwind",
+    "validation"
+  ],
   "type": "module",
   "main": "./dist/formo-vue.js",
   "module": "./dist/formo-vue.js",
