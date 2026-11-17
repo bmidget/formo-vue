@@ -2,6 +2,12 @@
 
 Forms as objects, for **Vue 3**.
 
+**[Documentation & Live Demos →](https://bmidget.github.io/formo-vue/)**
+
+```bash
+bun add formo-vue vee-validate
+```
+
 > **What Formo is (and isn't):** Formo is **not a UI library**—it doesn't lock you into a closed widget kit. Instead, Formo makes working with **forms, validation, state, and styling** effortless: define your form once as an object, and render it with the built-in Tailwind theme, **Nuxt UI**, **shadcn-vue**, or your own components.
 
 - **A form is one nested object**: every field keyed by its alias, subforms nested under `fields`. The **`Formo` builder** (`add`, `find`, `order`, `subform`, `addRulesFields`, `padBlueprint`…) is there for changing forms at runtime
